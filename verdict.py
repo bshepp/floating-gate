@@ -1,0 +1,88 @@
+"""Pre-registered verdicts for 08-floating-gate — FROZEN decision functions.
+
+Portfolio discipline (cf. 03's `classify_*`): the verdict is a pure function of summary
+statistics, with thresholds + operating point fixed *in this file, committed, before the
+run*. A reviewer can brute-force its input space (see tests/test_verdict.py). The verdict
+NEVER reads the raw sweep; it classifies the sweep's reported numbers.
+
+Only `classify_h5` (Phase 0) is frozen now. The Phase-1 / Phase-2 verdicts will be frozen
+here before those phases run, once the floating-gate device-characterization protocol is
+fixed.
+
+Operating point. 08 is the *aspirational* floating-gate arm: analog floating-gate
+transistors are not buyable as discrete parts (the analog form is integrated only — an
+academic FG-FPAA or a CMOS/MPW run), so unlike 06 (a buyable memristor) there is no device
+to characterize today. Phase 0 therefore evaluates against a PROVISIONAL `SIGMA_REALISTIC_FG`
+and carries `provisional=True` until a real floating-gate array confirms it at Phase 1
+(`sigma_confirmed`). The robust, device-independent output of Phase 0 is *where the wall is*
+and *that the two-read rule is the fragile one*.
+
+Caveat recorded in the spec (§3): floating-gate cells are typically LOW read-noise and
+non-volatile, so this read-noise gate is expected to PASS easily. An easy PASS means "read
+noise is not the wall", NOT "the device is fine" — the floating-gate wall is most likely
+write-side (programming asymmetry / granularity / endurance), a Phase-1 question.
+"""
+
+# --- Frozen thresholds (the portfolio-wide PASS bar; do not retune to a result) ---
+PASS_SNR = 3.0        # separation / noise-floor >= 3  -> a usable, above-floor learner
+FORECLOSE_SNR = 1.0   # SNR < 1 -> no separation survives; the operating point is dead
+
+# Provisional realistic read noise for a floating-gate readout, as a fraction of conductance
+# span. Pre-registered now; MUST be reconciled with the measured device noise before the
+# Phase-0 verdict is treated as final (set `sigma_confirmed=True` then). Floating-gate read
+# noise is expected at or below this.
+SIGMA_REALISTIC_FG = 0.01
+
+
+def classify_h5(snr_half, snr_full, sigma_fg=SIGMA_REALISTIC_FG, sigma_confirmed=False):
+    """Phase-0 read-noise gate for 02's in-fabric rules on a floating-gate array. FROZEN 2026-06-24.
+
+    Inputs (all reported by the H5 sweep, which reuses 02's readnoise.py and is run separately):
+      snr_half          SNR (separation / floor) of the HALF-co-located rule (one physical
+                        read) evaluated at `sigma_fg` read noise in the TRAINING relaxations.
+                        This is the buildable object; the verdict keys on it.
+      snr_full          SNR of the FULLY-co-located rule (two independent reads) at sigma_fg.
+                        02 already foreclosed this rule ~100x below realistic; its collapse
+                        here is a CONSISTENCY CHECK, not a PASS requirement.
+      sigma_fg          the operating point used (provisional by default).
+      sigma_confirmed   True once measured against a real floating-gate device (Phase 1).
+
+    Verdict (keys ONLY on the buildable half-co-located object):
+      PASS       snr_half >= PASS_SNR        -> the floating-gate read noise is survivable;
+                                                proceed to Phase 1 (where the write side is
+                                                the real test).
+      FORECLOSE  snr_half <  FORECLOSE_SNR   -> fragile even for the half-co-located rule;
+                                                redirect to a non-contrastive update or stop
+                                                before pursuing device access.
+      BOUNDARY   otherwise (1 <= SNR < 3)    -> marginal; sharpen before deciding.
+    """
+    if snr_half >= PASS_SNR:
+        status = "PASS"
+    elif snr_half < FORECLOSE_SNR:
+        status = "FORECLOSE"
+    else:
+        status = "BOUNDARY"
+    return {
+        "status": status,
+        "snr_half": float(snr_half),
+        "snr_full": float(snr_full),
+        "sigma_fg": float(sigma_fg),
+        "sigma_confirmed": bool(sigma_confirmed),
+        # expected True (02's finding): the fully-co-located two-read rule should collapse.
+        "full_rule_collapses_as_expected": bool(snr_full < FORECLOSE_SNR),
+        # a verdict on a provisional operating point is provisional, by construction.
+        "provisional": not bool(sigma_confirmed),
+    }
+
+
+def classify_transfer(*args, **kwargs):
+    """Phase-1 transfer verdict — NOT YET FROZEN. Freeze before the Phase-1 run, once the
+    floating-gate device-characterization protocol (read noise — confirming sigma_fg — plus
+    the write side: programming precision/granularity, tunneling/injection asymmetry,
+    endurance, retention) is finalized."""
+    raise NotImplementedError("classify_transfer is frozen before Phase 1, not before Phase 0.")
+
+
+def classify_build(*args, **kwargs):
+    """Phase-2 in-fabric build verdict — NOT YET FROZEN. Freeze before the build run."""
+    raise NotImplementedError("classify_build is frozen before Phase 2, not before Phase 0.")
