@@ -1,5 +1,5 @@
 """Phase-0 H5 runner: pure helpers, sweep integration, verdict assembly, and CLI."""
-from h5_sweep import foreclosure_wall, rule_audit
+from h5_sweep import foreclosure_wall, rule_audit, sweep
 
 
 def test_foreclosure_wall_finds_first_subthreshold():
@@ -23,3 +23,23 @@ def test_rule_audit_half_is_not_physical():
 
 def test_rule_audit_full_is_physical():
     assert rule_audit("full").is_physical() is True
+
+
+def test_sweep_returns_one_snr_row_per_sigma():
+    rows = sweep("half", [0.0, 0.1], n_epochs=10, seeds=range(2))
+    assert [r["train_sigma"] for r in rows] == [0.0, 0.1]
+    for r in rows:
+        assert r["snr_mean"] >= 0.0
+        assert len(r["snr_per_seed"]) == 2
+        assert r["audit"]["error_site"] == "off_array_cpu"
+
+
+def test_sweep_full_rule_carries_in_fabric_audit():
+    rows = sweep("full", [0.01], n_epochs=10, seeds=range(2))
+    assert rows[0]["audit"]["error_site"] == "on_array_local"
+
+
+def test_sweep_is_deterministic():
+    a = sweep("half", [0.05], n_epochs=10, seeds=range(2))
+    b = sweep("half", [0.05], n_epochs=10, seeds=range(2))
+    assert a[0]["snr_per_seed"] == b[0]["snr_per_seed"]

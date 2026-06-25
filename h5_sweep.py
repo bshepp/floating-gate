@@ -50,3 +50,50 @@ def foreclosure_wall(sigmas, snr_means, thresh=FORECLOSE_SNR):
         if snr < thresh:
             return float(s)
     return None
+
+
+def _build(H=8, a=0.4):
+    """Rebuild the parity-3 task + differential crossbar topology + read nonlinearity +
+    co-content (orchestration only; all builders are vendored from 02)."""
+    topo = build_full_diff(H)
+    X, y = parity3_data()
+    phi, dphi = make_read_nonlinearity(a)
+    s_fn = make_cocontent(a)
+    return topo, X, y, phi, dphi, s_fn
+
+
+def _cell(rule, train_sigma, *, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3,
+          n_epochs=300, seeds=range(10)):
+    """One (rule, train_sigma) cell. Trains each seed's noisy rule, evaluates clean-convention
+    (sep, floor), and forms per-seed SNR via 02's task.verdict; returns the aggregated row.
+    The eval RNG is a fresh fixed-seed generator -> pure/deterministic (mirrors 02's sweep)."""
+    topo, X, y, phi, dphi, s_fn = _build(H, a)
+    cfg = DeviceConfig()
+    eval_rng = np.random.default_rng(12345)
+    snrs, seps, audit = [], [], None
+    for s in seeds:
+        if rule == "half":
+            res = train_manhattan_noisy(topo, X, y, phi, dphi, V_drive, cfg,
+                                        n_epochs=n_epochs, seed=int(s), target=target,
+                                        train_sigma=train_sigma)
+        elif rule == "full":
+            res = train_coupled_noisy(topo, X, y, phi, dphi, V_drive, cfg,
+                                      n_epochs=n_epochs, seed=int(s), target=target,
+                                      beta=beta, s_fn=s_fn, train_sigma=train_sigma, mode="sign")
+        else:
+            raise ValueError(f"unknown rule {rule!r}")
+        audit = res["audit"]
+        sep, floor = evaluate_separation(topo, res["g"], X, y, phi, dphi, V_drive, cfg, eval_rng)
+        snrs.append(float(task_verdict(sep, floor)["snr"]))
+        seps.append(float(sep))
+    return {"rule": rule, "train_sigma": float(train_sigma),
+            "snr_mean": float(np.mean(snrs)), "snr_per_seed": snrs,
+            "sep_mean": float(np.mean(seps)), "audit": audit}
+
+
+def sweep(rule, sigmas, *, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3,
+          n_epochs=300, seeds=range(10)):
+    """Run `rule` over the train_sigma grid (serial); one SNR row per sigma, input order."""
+    seeds = list(seeds)
+    return [_cell(rule, s, H=H, a=a, V_drive=V_drive, beta=beta, target=target,
+                  n_epochs=n_epochs, seeds=seeds) for s in sigmas]
