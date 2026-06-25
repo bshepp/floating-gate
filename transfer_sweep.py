@@ -72,3 +72,58 @@ def min_reads_to_pass(cfg, sigma_fg, *, K_grid=None, H=8, a=0.4, V_drive=1.5, be
         if snr >= PASS_SNR:
             return {"snr_robust": float(snr), "robust_reads_K": int(K)}
     return {"snr_robust": float(best_snr), "robust_reads_K": int(best_K)}
+
+
+def _knob_sweeps(nominal_cfg, sigma_fg, *, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3,
+                 n_epochs=300, seeds=range(10)):
+    """Observed robustness: vary each FG knob one-at-a-time around the nominal cfg and record the
+    half-rule SNR at each value (the gate object's sensitivity to each write-side non-ideality)."""
+    out = {}
+    for knob, vals in FG_SWEEPS.items():
+        rows = []
+        for v in vals:
+            cfg = dataclasses.replace(nominal_cfg, **{knob: v})
+            rows.append({"value": v,
+                         "snr_half": _snr_at_cfg("half", cfg, sigma_fg, H=H, a=a, V_drive=V_drive,
+                                                 beta=beta, target=target, n_epochs=n_epochs,
+                                                 seeds=seeds)})
+        out[knob] = rows
+    return out
+
+
+def run_transfer(*, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3, n_epochs=300, seeds=range(10),
+                 sigma_fg=SIGMA_FG, endurance_budget=ENDURANCE_BUDGET, params_confirmed=False,
+                 K_grid=None):
+    """Drive the gate (half rule at the nominal FG cfg), the elevated in-fabric records (the two-read
+    rule, and the multi-read-averaged robust candidate), the endurance check, and the Observed knob
+    sweeps; classify with the frozen classify_transfer; record the two-axis audit for both rules."""
+    seeds = list(seeds)
+    cfg = fg_device_config()
+    kw = dict(H=H, a=a, V_drive=V_drive, beta=beta, target=target, n_epochs=n_epochs, seeds=seeds)
+
+    snr_half = _snr_at_cfg("half", cfg, sigma_fg, **kw)            # GATE (buildable object)
+    snr_full = _snr_at_cfg("full", cfg, sigma_fg, **kw)            # in-fabric two-read at FG op point
+    robust = min_reads_to_pass(cfg, sigma_fg, K_grid=K_grid, **kw)  # multi-read-averaged candidate
+    wpc = writes_per_cell(n_epochs)
+
+    verdict = classify_transfer(snr_half, snr_full, robust["snr_robust"], wpc, endurance_budget,
+                                robust["robust_reads_K"], params_confirmed=params_confirmed)
+
+    sweeps = _knob_sweeps(cfg, sigma_fg, **kw)
+
+    audit = {}
+    for rule in ("half", "full"):
+        a_rec = rule_audit(rule)
+        audit[rule] = {"breakdown": {f"{g}|{w}": c for (g, w), c in a_rec.breakdown().items()},
+                       "is_physical": a_rec.is_physical()}
+
+    return {
+        "config": {"H": H, "a": a, "V_drive": V_drive, "beta": beta, "target": target,
+                   "n_epochs": n_epochs, "n_seeds": len(seeds), "sigma_fg": float(sigma_fg),
+                   "endurance_budget": int(endurance_budget)},
+        "nominal_cfg": dataclasses.asdict(cfg),
+        "snr_half": float(snr_half), "snr_full": float(snr_full),
+        "snr_robust": float(robust["snr_robust"]), "robust_reads_K": int(robust["robust_reads_K"]),
+        "writes_per_cell": int(wpc),
+        "verdict": verdict, "sweeps": sweeps, "audit": audit,
+    }
