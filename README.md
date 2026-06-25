@@ -5,9 +5,13 @@
 array** — the device family that stores an analog weight as non-volatile charge on an
 isolated gate and updates it by a *physical* tunneling / hot-carrier injection event.
 
-**Created:** 2026-06-24. **Status:** scaffolded; Phase 0 (the H5 sim gate) is pre-registered
-and pending its run. **Aspirational / trailing:** no floating-gate device is owned or buyable
-(see below), so the operating point is provisional and nothing is built until access is secured.
+**Created:** 2026-06-24. **Status:** Phase 0 (the H5 sim gate) **ran 2026-06-24 → PASS (provisional)**
+on the buildable half-co-located rule (`snr_half=15.4 ≥ 3` at `σ_fg=0.01`); the genuinely in-fabric
+two-read rule **forecloses** at `σ_fg` (the read-noise-robust rule is not in-fabric). Read noise is
+not the wall — the decision shifts to **Phase 1** (device access + the write side). See
+`docs/superpowers/findings/2026-06-24-phase0-h5-readnoise-findings.md`. **Aspirational / trailing:** no
+floating-gate device is owned or buyable (see below), so the operating point is provisional and
+nothing is built until access is secured.
 
 ## The three crossbar cousins (and why only two can learn)
 
