@@ -1,5 +1,8 @@
 """Phase-0 H5 runner: pure helpers, sweep integration, verdict assembly, and CLI."""
-from h5_sweep import foreclosure_wall, rule_audit, sweep
+import json
+
+from h5_sweep import foreclosure_wall, rule_audit, sweep, run_h5, main
+from verdict import SIGMA_REALISTIC_FG
 
 
 def test_foreclosure_wall_finds_first_subthreshold():
@@ -45,10 +48,6 @@ def test_sweep_is_deterministic():
     assert a[0]["snr_per_seed"] == b[0]["snr_per_seed"]
 
 
-from h5_sweep import run_h5
-from verdict import SIGMA_REALISTIC_FG
-
-
 def test_run_h5_assembles_both_verdicts_and_audits():
     res = run_h5(sigmas=[0.0, 0.01, 0.1], seeds=range(2), n_epochs=10)
     # frozen primary verdict keyed on the half rule
@@ -71,6 +70,18 @@ def test_run_h5_inserts_sigma_fg_if_missing():
 
 
 def test_run_h5_audit_breakdown_is_json_safe():
-    import json
     res = run_h5(sigmas=[0.01], seeds=range(1), n_epochs=8)
     json.dumps(res)  # must not raise (tuple keys would)
+
+
+def test_main_quick_writes_json_with_both_verdicts(tmp_path):
+    out = tmp_path / "h5.json"
+    res = main(["--quick", "--out", str(out)])
+    assert out.exists()
+    data = json.loads(out.read_text())
+    assert set(data) >= {"config", "curves", "walls", "verdict",
+                         "in_fabric_verdict", "audit", "snr_half", "snr_full"}
+    assert data["verdict"]["provisional"] is True
+    assert data["audit"]["half"]["is_physical"] is False
+    assert data["audit"]["full"]["is_physical"] is True
+    assert res["config"]["n_seeds"] == 2

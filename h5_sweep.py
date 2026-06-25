@@ -157,3 +157,62 @@ def run_h5(sigmas=None, *, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3,
         "snr_half": float(snr_half), "snr_full": float(snr_full),
         "verdict": primary, "in_fabric_verdict": in_fabric, "audit": audit,
     }
+
+
+_QUICK = {"sigmas": [0.0, 0.01, 0.1], "seeds": range(2), "n_epochs": 20}
+
+
+def _print_summary(res):
+    c = res["config"]
+    half = {r["train_sigma"]: r["snr_mean"] for r in res["curves"]["half"]}
+    full = {r["train_sigma"]: r["snr_mean"] for r in res["curves"]["full"]}
+    print("=" * 78)
+    print("PHASE-0 H5 read-noise gate — 02's rules on a floating-gate array (parity-3)")
+    print("=" * 78)
+    print(f"sigma_fg={c['sigma_fg']}  n_seeds={c['n_seeds']}  n_epochs={c['n_epochs']}  beta={c['beta']}")
+    print("\n-- mean SNR vs train_sigma --")
+    print(f"  {'train_sigma':>12} {'half(SNR)':>12} {'full(SNR)':>12}")
+    for s in c["sigmas"]:
+        print(f"  {s:>12} {half.get(s, float('nan')):>12.3f} {full.get(s, float('nan')):>12.3f}")
+    print(f"\nforeclosure walls (train_sigma): half={res['walls']['half']}  full={res['walls']['full']}")
+    v = res["verdict"]
+    print(f"\nPRIMARY (frozen classify_h5, keys on the buildable HALF rule): {v['status']}")
+    print(f"  snr_half={v['snr_half']:.3f}  provisional={v['provisional']}  "
+          f"full_collapses_as_expected={v['full_rule_collapses_as_expected']}")
+    f = res["in_fabric_verdict"]
+    print(f"IN-FABRIC (elevated, the both-physical FULL rule): {f['status']}  "
+          f"snr_full={f['snr_full']:.3f}  is_physical={f['is_physical']}")
+    print(f"audit: half is_physical={res['audit']['half']['is_physical']}  "
+          f"full is_physical={res['audit']['full']['is_physical']}  "
+          f"(robust rule is NOT in-fabric; in-fabric rule is the fragile one)")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        description="Phase-0 H5 read-noise gate for 02's rules on a floating-gate array.")
+    ap.add_argument("--out", default="h5_sweep_parity3.json")
+    ap.add_argument("--epochs", type=int, default=300)
+    ap.add_argument("--seeds", type=int, default=10)
+    ap.add_argument("--beta", type=float, default=0.1)
+    ap.add_argument("--sigmas", default=None,
+                    help="comma-separated train_sigma grid (overrides DEFAULT_SIGMAS)")
+    ap.add_argument("--quick", action="store_true",
+                    help="tiny local smoke (few sigmas/seeds/epochs)")
+    args = ap.parse_args(argv)
+
+    sigmas = [float(x) for x in args.sigmas.split(",")] if args.sigmas else None
+    if args.quick:
+        res = run_h5(sigmas=_QUICK["sigmas"], seeds=_QUICK["seeds"],
+                     n_epochs=_QUICK["n_epochs"], beta=args.beta)
+    else:
+        res = run_h5(sigmas=sigmas, seeds=range(args.seeds), n_epochs=args.epochs, beta=args.beta)
+
+    _print_summary(res)
+    with open(args.out, "w") as fp:
+        json.dump(res, fp, indent=2)
+    print(f"\nraw numbers -> {args.out}")
+    return res
+
+
+if __name__ == "__main__":
+    main()
