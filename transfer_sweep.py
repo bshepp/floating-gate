@@ -127,3 +127,55 @@ def run_transfer(*, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3, n_epochs=300,
         "writes_per_cell": int(wpc),
         "verdict": verdict, "sweeps": sweeps, "audit": audit,
     }
+
+
+_QUICK = {"seeds": range(2), "n_epochs": 20, "K_grid": [1, 4]}
+
+
+def _print_summary(res):
+    c = res["config"]
+    v = res["verdict"]
+    print("=" * 78)
+    print("PHASE-1 transfer sim gate — 02's rules on an FG array at FG-realistic params (parity-3)")
+    print("=" * 78)
+    print(f"sigma_fg={c['sigma_fg']}  n_seeds={c['n_seeds']}  n_epochs={c['n_epochs']}  "
+          f"endurance_budget={c['endurance_budget']}")
+    print(f"\nGATE (frozen classify_transfer, keys on the buildable HALF rule): {v['status']}")
+    print(f"  snr_half={v['snr_half']:.3f}  writes_per_cell={v['writes_per_cell']}  "
+          f"endurance_ok={v['endurance_ok']}  provisional={v['provisional']}")
+    print(f"IN-FABRIC (elevated): two-read full={v['full_status']} (snr={v['snr_full']:.3f}); "
+          f"multi-read robust={v['robust_status']} (snr={v['snr_robust']:.3f} at K={v['robust_reads_K']}); "
+          f"in_fabric_achieved={v['in_fabric_achieved']}")
+    print(f"audit: half is_physical={res['audit']['half']['is_physical']}  "
+          f"full is_physical={res['audit']['full']['is_physical']}")
+    print("\n-- Observed: half-rule SNR vs each FG knob (one-at-a-time) --")
+    for knob, rows in res["sweeps"].items():
+        cells = "  ".join(f"{r['value']}:{r['snr_half']:.2f}" for r in rows)
+        print(f"  {knob:<12} {cells}")
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        description="Phase-1 transfer sim gate for 02's rules on a floating-gate array.")
+    ap.add_argument("--out", default="transfer_parity3.json")
+    ap.add_argument("--epochs", type=int, default=300)
+    ap.add_argument("--seeds", type=int, default=10)
+    ap.add_argument("--beta", type=float, default=0.1)
+    ap.add_argument("--quick", action="store_true", help="tiny local smoke (few seeds/epochs/K)")
+    args = ap.parse_args(argv)
+
+    if args.quick:
+        res = run_transfer(seeds=_QUICK["seeds"], n_epochs=_QUICK["n_epochs"],
+                           beta=args.beta, K_grid=_QUICK["K_grid"])
+    else:
+        res = run_transfer(seeds=range(args.seeds), n_epochs=args.epochs, beta=args.beta)
+
+    _print_summary(res)
+    with open(args.out, "w") as fp:
+        json.dump(res, fp, indent=2)
+    print(f"\nraw numbers -> {args.out}")
+    return res
+
+
+if __name__ == "__main__":
+    main()

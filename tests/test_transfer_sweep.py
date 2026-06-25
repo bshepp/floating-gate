@@ -2,7 +2,7 @@
 only (no science numbers)."""
 import json
 from fg_params import fg_device_config, SIGMA_FG
-from transfer_sweep import _snr_at_cfg, min_reads_to_pass, run_transfer
+from transfer_sweep import _snr_at_cfg, min_reads_to_pass, run_transfer, main
 
 
 def test_snr_at_cfg_returns_nonneg_and_is_deterministic():
@@ -40,3 +40,14 @@ def test_run_transfer_endurance_recorded():
     res = run_transfer(n_epochs=10, seeds=range(1), K_grid=[1])
     assert res["verdict"]["endurance_ok"] is True       # 10 writes << 1e5 budget
     assert res["verdict"]["writes_per_cell"] == 10
+
+
+def test_main_quick_writes_json_with_verdict(tmp_path):
+    out = tmp_path / "transfer.json"
+    res = main(["--quick", "--out", str(out)])
+    assert out.exists()
+    data = json.loads(out.read_text())
+    assert set(data) >= {"config", "nominal_cfg", "verdict", "sweeps", "audit",
+                         "snr_half", "snr_full", "snr_robust", "robust_reads_K", "writes_per_cell"}
+    assert data["verdict"]["provisional"] is True
+    assert res["config"]["n_seeds"] == 2
