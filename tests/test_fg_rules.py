@@ -31,6 +31,7 @@ def test_averaged_read_k1_is_a_single_read():
     a = averaged_noisy_read(g, 0.02, cfg, np.random.default_rng(1), 1)
     b = np.asarray(noisy_read(g, 0.02, cfg, np.random.default_rng(1)))
     assert np.allclose(a, b)
+    assert isinstance(a, np.ndarray)
 
 
 def test_writes_per_cell_is_n_epochs():

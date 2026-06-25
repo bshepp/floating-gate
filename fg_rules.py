@@ -23,7 +23,7 @@ def averaged_noisy_read(g, sigma, cfg, rng, K):
     g = np.asarray(g, float)
     K = int(K)
     if K <= 1:
-        return noisy_read(g, sigma, cfg, rng)
+        return np.asarray(noisy_read(g, sigma, cfg, rng), float)
     acc = np.zeros_like(g)
     for _ in range(K):
         acc = acc + np.asarray(noisy_read(g, sigma, cfg, rng), float)
