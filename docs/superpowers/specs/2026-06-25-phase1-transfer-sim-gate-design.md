@@ -99,27 +99,33 @@ literature citations; this spec fixes the *mapping and method*, not the numbers 
 ## 4. Endurance — the one genuinely new knob (a write-budget check)
 
 `DeviceConfig` does not model endurance. Phase 1 adds a **lightweight write-budget check**, not
-degradation dynamics: count `writes_per_cell` = the **maximum** program/erase pulses any *single* cell
-receives over a training run (the worst-case cell hits the endurance limit first, so the max — not the
-sum or mean — is the binding quantity), and compare against an `ENDURANCE_BUDGET` (FG program/erase
-endurance, ~1e5–1e6 cycles, cited in `fg_params.py`). If `writes_per_cell > ENDURANCE_BUDGET`, the gate
-FORECLOSEs (the device physically cannot complete the training). Rationale: a clean physical constraint
-with minimal new assumptions; **degradation dynamics** (dG0 shrink / `sigma_write` growth past N cycles)
-are a deferred refinement, noted in findings. Per-cell pulse counts are tallied from the vendored rules'
-pulse activity (which cells `apply_pulse` actually fires each step), not modeled anew.
+degradation dynamics: `writes_per_cell` = the **worst-case** program/erase pulses any single cell
+receives over a training run, taken as the conservative upper bound **`n_epochs`** (the sign rules fire
+a pulse on nearly every step where the per-edge gradient sign is nonzero, so one write per cell per
+epoch bounds it; the worst-case cell — not a sum or mean — is what hits the endurance limit first).
+Compare against an `ENDURANCE_BUDGET` (FG program/erase endurance, ~1e5–1e6 cycles, cited in
+`fg_params.py`). If `writes_per_cell > ENDURANCE_BUDGET`, the gate FORECLOSEs (the device physically
+cannot complete the training). Rationale: a clean physical constraint with minimal new assumptions, and
+over-counting only tightens the margin (the safe direction), so no instrumentation of the vendored train
+loop is needed; **degradation dynamics** (dG0 shrink / `sigma_write` growth past N cycles) are a deferred
+refinement, noted in findings.
 
 ## 5. The read-noise-robust in-fabric candidate — multi-read averaging
 
 Phase 0's sharpest open question: **is the in-fabric read-noise wall buyable?** The cheapest, most
 quantifiable candidate is **multi-read averaging** — average `K` independent noisy reads per relaxation
-before forming the two-read contrast, so the per-read noise scales as `σ/√K` (trading write energy/time
-for read SNR). `fg_rules.py` implements this by **composing the vendored primitives** (`free_voltages`,
-`nudged_solve`, `apply_pulse`, and an averaged `noisy_read`) in a new 08-authored rule — it does **not**
-edit the frozen `vendor_02/` ports. The run reports `snr_robust` at the smallest `K` that clears the bar
-(or that K is impractically large). This directly quantifies the cost: e.g. lifting the two-read rule from
-its wall (~1e-4, per `02`'s 5.x) to `σ_fg ≈ 1e-2` needs `K ≈ (1e-2 / 1e-4)² = 1e4` reads/step — the
-verdict states the number honestly, so "in-fabric is buyable but at K≈10⁴ reads" is a real, recorded
-finding (a novel *single-read* estimator is the open alternative, deferred).
+before forming the two-read contrast. Averaging `K` i.i.d. reads reduces the read-noise std by `√K` (a
+true statistical identity), so a `K`-averaged two-read update at read noise `σ` is **distributionally the
+vendored two-read rule at an effective read noise `σ/√K`** (exact up to the clip at the conductance
+bounds, negligible near mid-range). Therefore `snr_robust` is computed by running the **existing vendored
+full rule at `train_sigma = σ_fg/√K`** — no reimplementation of the contrastive step. `fg_rules.py`
+provides `effective_sigma(σ, K) = σ/√K` and an `averaged_noisy_read` used only to **validate** the
+equivalence in a test (its empirical std ≈ `σ/√K`); it never edits the frozen `vendor_02/` ports. The run
+reports `snr_robust` at the smallest `K` (from a committed grid) that clears the bar. This directly
+quantifies the cost: lifting the two-read rule from its wall (~1e-4, per `02`'s 5.x) to `σ_fg ≈ 1e-2`
+needs `K ≈ (1e-2 / 1e-4)² = 1e4` reads/step — the verdict states the number honestly, so "in-fabric is
+buyable but at K≈10⁴ reads" is a real, recorded finding (a novel *single-read* estimator is the open
+alternative, deferred).
 
 ## 6. Components
 
