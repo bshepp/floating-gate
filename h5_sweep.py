@@ -45,7 +45,12 @@ def rule_audit(rule):
 
 def foreclosure_wall(sigmas, snr_means, thresh=FORECLOSE_SNR):
     """First train_sigma (scanned in ascending sigma order) whose mean SNR < thresh — the
-    foreclosure cliff — or None if SNR never falls below thresh in the swept range."""
+    foreclosure cliff — or None if SNR never falls below thresh in the swept range.
+
+    Caveat: a returned 0.0 means the CLEAN baseline (train_sigma=0) is itself sub-threshold —
+    the rule never learned — which reads the same as a wall at the first noisy point. Check the
+    train_sigma=0 SNR to disambiguate (cf. 02's cliff_table). For the gated real run the clean
+    baseline is expected to pass, so a 0.0 wall there would signal a training failure, not a wall."""
     for s, snr in sorted(zip(sigmas, snr_means), key=lambda p: p[0]):
         if snr < thresh:
             return float(s)
