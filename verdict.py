@@ -75,12 +75,60 @@ def classify_h5(snr_half, snr_full, sigma_fg=SIGMA_REALISTIC_FG, sigma_confirmed
     }
 
 
-def classify_transfer(*args, **kwargs):
-    """Phase-1 transfer verdict — NOT YET FROZEN. Freeze before the Phase-1 run, once the
-    floating-gate device-characterization protocol (read noise — confirming sigma_fg — plus
-    the write side: programming precision/granularity, tunneling/injection asymmetry,
-    endurance, retention) is finalized."""
-    raise NotImplementedError("classify_transfer is frozen before Phase 1, not before Phase 0.")
+def classify_transfer(snr_half, snr_full, snr_robust, writes_per_cell, endurance_budget,
+                      robust_reads_K, params_confirmed=False):
+    """Phase-1 transfer gate for 02's rules on an FG array at FG-realistic params. FROZEN 2026-06-25.
+
+    Inputs (reported by transfer_sweep, which re-sims 02's vendored rules at an FG DeviceConfig):
+      snr_half          SNR of the BUILDABLE half-co-located rule (one read, off-array gradient) at the
+                        FG operating point. The gate keys on this.
+      snr_full          SNR of the genuinely in-fabric two-read rule. Expected FORECLOSE (read noise;
+                        Phase 0). Recorded co-equally, not gating.
+      snr_robust        SNR of the multi-read-averaged in-fabric candidate at robust_reads_K reads.
+      writes_per_cell   worst-case program/erase pulses any single cell sees over a training run.
+      endurance_budget  the FG program/erase endurance budget (committed in fg_params).
+      robust_reads_K    the read-averaging factor K at which snr_robust was achieved.
+      params_confirmed  True once measured against a real FG device; else the verdict is provisional.
+
+    Verdict (gate on the buildable object, subject to a hard endurance constraint):
+      FORECLOSE  endurance blown OR snr_half < FORECLOSE_SNR  -> don't tape out (write side / endurance
+                                                                 kills even the buildable learner).
+      PASS       endurance ok AND snr_half >= PASS_SNR        -> the write side transfers; a tapeout is
+                                                                 earned (>= inference-grade array).
+      BOUNDARY   otherwise.
+    Elevated (the in-fabric question, recorded co-equally): full_status, robust_status, in_fabric_achieved.
+    """
+    def _band(x):
+        if x >= PASS_SNR:
+            return "PASS"
+        if x < FORECLOSE_SNR:
+            return "FORECLOSE"
+        return "BOUNDARY"
+
+    endurance_ok = writes_per_cell <= endurance_budget
+    if (not endurance_ok) or snr_half < FORECLOSE_SNR:
+        status = "FORECLOSE"
+    elif snr_half >= PASS_SNR:
+        status = "PASS"
+    else:
+        status = "BOUNDARY"
+    robust_status = _band(snr_robust)
+    return {
+        "status": status,
+        "snr_half": float(snr_half),
+        "snr_full": float(snr_full),
+        "snr_robust": float(snr_robust),
+        # elevated, co-equal in-fabric records (Phase-0 pattern):
+        "full_status": _band(snr_full),            # expected FORECLOSE (two-read read-noise fragility)
+        "robust_status": robust_status,            # does multi-read averaging buy in-fabric learning?
+        "in_fabric_achieved": robust_status == "PASS",
+        "endurance_ok": bool(endurance_ok),
+        "writes_per_cell": int(writes_per_cell),
+        "endurance_budget": int(endurance_budget),
+        "robust_reads_K": int(robust_reads_K),
+        "params_confirmed": bool(params_confirmed),
+        "provisional": not bool(params_confirmed),
+    }
 
 
 def classify_build(*args, **kwargs):

@@ -59,6 +59,53 @@ def test_verdict_is_provisional_until_device_noise_confirmed():
 
 def test_later_phase_verdicts_are_not_yet_frozen():
     with pytest.raises(NotImplementedError):
-        classify_transfer()
-    with pytest.raises(NotImplementedError):
         classify_build()
+
+
+def test_transfer_pass_when_half_transfers_and_endurance_ok():
+    res = classify_transfer(snr_half=8.0, snr_full=0.0, snr_robust=0.0,
+                            writes_per_cell=300, endurance_budget=100_000, robust_reads_K=10_000)
+    assert res["status"] == "PASS"
+    assert res["endurance_ok"] is True
+    assert res["provisional"] is True
+
+
+def test_transfer_forecloses_when_half_rule_dies():
+    res = classify_transfer(snr_half=0.4, snr_full=0.0, snr_robust=0.0,
+                            writes_per_cell=300, endurance_budget=100_000, robust_reads_K=10_000)
+    assert res["status"] == "FORECLOSE"
+
+
+def test_transfer_forecloses_when_endurance_blown_even_if_half_passes():
+    res = classify_transfer(snr_half=8.0, snr_full=0.0, snr_robust=0.0,
+                            writes_per_cell=200_000, endurance_budget=100_000, robust_reads_K=10_000)
+    assert res["status"] == "FORECLOSE"
+    assert res["endurance_ok"] is False
+
+
+def test_transfer_boundary_in_between():
+    res = classify_transfer(snr_half=2.0, snr_full=0.0, snr_robust=0.0,
+                            writes_per_cell=300, endurance_budget=100_000, robust_reads_K=1)
+    assert res["status"] == "BOUNDARY"
+
+
+def test_transfer_records_elevated_in_fabric_verdicts():
+    res = classify_transfer(snr_half=8.0, snr_full=0.0, snr_robust=4.0,
+                            writes_per_cell=300, endurance_budget=100_000, robust_reads_K=10_000)
+    assert res["full_status"] == "FORECLOSE"      # two-read rule dead on read noise
+    assert res["robust_status"] == "PASS"         # multi-read averaging clears the bar
+    assert res["in_fabric_achieved"] is True
+    assert res["robust_reads_K"] == 10_000
+
+
+def test_transfer_in_fabric_not_achieved_when_robust_subthreshold():
+    res = classify_transfer(snr_half=8.0, snr_full=0.0, snr_robust=0.5,
+                            writes_per_cell=300, endurance_budget=100_000, robust_reads_K=10_000)
+    assert res["in_fabric_achieved"] is False
+
+
+def test_transfer_flips_to_final_when_params_confirmed():
+    res = classify_transfer(snr_half=8.0, snr_full=0.0, snr_robust=0.0,
+                            writes_per_cell=300, endurance_budget=100_000, robust_reads_K=1,
+                            params_confirmed=True)
+    assert res["provisional"] is False
