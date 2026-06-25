@@ -109,9 +109,10 @@ explicit. Same inputs ⇒ identical numbers.
 **Emitted result** — `h5_sweep.py:main()` writes `h5_sweep_parity3.json`
 (config · per-rule SNR curves · wall locations · `σ_fg` SNRs · the frozen verdict dict · the
 elevated in-fabric verdict · both audits) and prints a summary table (per-rule SNR-vs-σ, both
-verdicts, both `is_physical` flags). CLI: `--quick`, `--sigmas`, `--seeds`, `--epochs`, `--nproc`,
-`--out`, and `--beta` (single coupled nudge, default `0.1`). No `--betas` grid — the Phase-0 gate
-sweeps only `train_sigma`; `02`'s β-scaling (Effect A) is not part of this read-noise verdict.
+verdicts, both `is_physical` flags). CLI: `--quick`, `--sigmas`, `--seeds`, `--epochs`, `--out`,
+and `--beta` (single coupled nudge, default `0.1`). Serial execution — the full grid is ~2 rules ×
+7 σ × 10 seeds ≈ 140 short trainings (well under a minute), so no `--nproc`; and no `--betas` grid
+— the Phase-0 gate sweeps only `train_sigma` (`02`'s β-scaling, Effect A, is not part of it).
 
 ## 4. Tests (`tests/test_h5_sweep.py`, TDD)
 
