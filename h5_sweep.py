@@ -97,3 +97,63 @@ def sweep(rule, sigmas, *, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3,
     seeds = list(seeds)
     return [_cell(rule, s, H=H, a=a, V_drive=V_drive, beta=beta, target=target,
                   n_epochs=n_epochs, seeds=seeds) for s in sigmas]
+
+
+def _status_from_snr(snr):
+    """The same PASS/BOUNDARY/FORECLOSE bands classify_h5 uses, applied to the full rule
+    so its in-fabric verdict is recorded co-equally (not just as a collapse boolean)."""
+    if snr >= PASS_SNR:
+        return "PASS"
+    if snr < FORECLOSE_SNR:
+        return "FORECLOSE"
+    return "BOUNDARY"
+
+
+def run_h5(sigmas=None, *, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3,
+           n_epochs=300, seeds=range(10), sigma_fg=SIGMA_REALISTIC_FG, sigma_confirmed=False):
+    """Drive both rules over the train_sigma grid; assemble the frozen primary verdict, the
+    elevated in-fabric verdict, the foreclosure walls, and the two-axis audits."""
+    seeds = list(seeds)
+    sigmas = list(DEFAULT_SIGMAS if sigmas is None else sigmas)
+    if sigma_fg not in sigmas:
+        sigmas = sorted(set(sigmas) | {sigma_fg})
+
+    curves = {rule: sorted(sweep(rule, sigmas, H=H, a=a, V_drive=V_drive, beta=beta,
+                                 target=target, n_epochs=n_epochs, seeds=seeds),
+                           key=lambda r: r["train_sigma"])
+              for rule in RULES}
+
+    def _snr_at(rule, s):
+        for r in curves[rule]:
+            if r["train_sigma"] == s:
+                return r["snr_mean"]
+        raise KeyError(s)
+
+    snr_half = _snr_at("half", sigma_fg)
+    snr_full = _snr_at("full", sigma_fg)
+
+    primary = classify_h5(snr_half, snr_full, sigma_fg=sigma_fg, sigma_confirmed=sigma_confirmed)
+
+    walls = {rule: foreclosure_wall([r["train_sigma"] for r in curves[rule]],
+                                    [r["snr_mean"] for r in curves[rule]])
+             for rule in RULES}
+
+    in_fabric = {"rule": "full_coupled_two_read", "snr_full": float(snr_full),
+                 "status": _status_from_snr(snr_full), "wall": walls["full"],
+                 "is_physical": True,
+                 "note": "both-physical / physics-local; the read-noise-fragile rule"}
+
+    audit = {}
+    for rule in RULES:
+        a_rec = rule_audit(rule)
+        audit[rule] = {"breakdown": {f"{g}|{w}": c for (g, w), c in a_rec.breakdown().items()},
+                       "is_physical": a_rec.is_physical()}
+
+    return {
+        "config": {"H": H, "a": a, "V_drive": V_drive, "beta": beta, "target": target,
+                   "n_epochs": n_epochs, "n_seeds": len(seeds), "sigmas": sigmas,
+                   "sigma_fg": float(sigma_fg)},
+        "curves": curves, "walls": walls,
+        "snr_half": float(snr_half), "snr_full": float(snr_full),
+        "verdict": primary, "in_fabric_verdict": in_fabric, "audit": audit,
+    }

@@ -43,3 +43,34 @@ def test_sweep_is_deterministic():
     a = sweep("half", [0.05], n_epochs=10, seeds=range(2))
     b = sweep("half", [0.05], n_epochs=10, seeds=range(2))
     assert a[0]["snr_per_seed"] == b[0]["snr_per_seed"]
+
+
+from h5_sweep import run_h5
+from verdict import SIGMA_REALISTIC_FG
+
+
+def test_run_h5_assembles_both_verdicts_and_audits():
+    res = run_h5(sigmas=[0.0, 0.01, 0.1], seeds=range(2), n_epochs=10)
+    # frozen primary verdict keyed on the half rule
+    assert res["verdict"]["status"] in {"PASS", "BOUNDARY", "FORECLOSE"}
+    assert res["verdict"]["snr_half"] == res["snr_half"]
+    assert res["verdict"]["provisional"] is True
+    assert res["config"]["sigma_fg"] == SIGMA_REALISTIC_FG
+    # elevated co-equal in-fabric verdict keyed on the full rule
+    assert res["in_fabric_verdict"]["snr_full"] == res["snr_full"]
+    assert res["in_fabric_verdict"]["status"] in {"PASS", "BOUNDARY", "FORECLOSE"}
+    assert res["in_fabric_verdict"]["is_physical"] is True
+    # two-axis audit: half NOT both-physical, full both-physical
+    assert res["audit"]["half"]["is_physical"] is False
+    assert res["audit"]["full"]["is_physical"] is True
+
+
+def test_run_h5_inserts_sigma_fg_if_missing():
+    res = run_h5(sigmas=[0.0, 0.1], seeds=range(1), n_epochs=8)
+    assert SIGMA_REALISTIC_FG in res["config"]["sigmas"]
+
+
+def test_run_h5_audit_breakdown_is_json_safe():
+    import json
+    res = run_h5(sigmas=[0.01], seeds=range(1), n_epochs=8)
+    json.dumps(res)  # must not raise (tuple keys would)
