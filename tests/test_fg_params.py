@@ -18,7 +18,8 @@ def test_nominal_cfg_is_fg_directional():
     assert isinstance(cfg, DeviceConfig)
     assert cfg.sigma_read == SIGMA_FG
     assert cfg.drift == 0.0          # FG retention is excellent
-    assert cfg.nonlin > 2.0          # FG update is strongly nonlinear
+    assert cfg.nonlin >= 2.0         # FG update is (effectively) nonlinear
+    assert cfg.n_levels >= 128       # high-precision closed-loop programming
     assert cfg.asym < 0.5            # tunneling/injection asymmetry
 
 

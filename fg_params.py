@@ -27,13 +27,18 @@ ENDURANCE_BUDGET = 100_000  # ~1e5 program/erase cycles (conservative low end of
 
 
 def fg_device_config():
-    """The committed nominal FG operating point: 02's DeviceConfig re-valued for a floating gate —
-    strong update nonlinearity + tunneling/injection asymmetry, ~5-bit programming granularity,
-    excellent retention (drift=0), quiet read. g_min/g_max/dG0 keep 02's defaults."""
+    """The committed nominal FG operating point: a HIGH-PRECISION, CLOSED-LOOP-programmed floating gate.
+    The raw FG update (Fowler-Nordheim tunneling / hot-electron injection) is strongly nonlinear, but
+    closed-loop program-verify compensates it to land on each target level, so the EFFECTIVE update is
+    only mildly nonlinear (~nu=2) at ~8-bit precision (n_levels=256). Strong tunneling/injection
+    asymmetry and excellent retention (drift=0) are kept; read is quiet. NOTE (verified 2026-06-25): the
+    RAW un-compensated nonlinearity (nu>=3) FORECLOSES even at continuous precision -- so UPDATE
+    NONLINEARITY, not granularity, is the binding non-ideality; the nonlin sweep (FG_SWEEPS) probes it
+    directly (nu->0 = 02's pulse-co-design limit). g_min/g_max/dG0 keep 02's defaults."""
     return DeviceConfig(
-        nonlin=3.0,        # > 02's 2.0: FG injection/tunneling is strongly state-dependent
+        nonlin=2.0,        # EFFECTIVE post-closed-loop nonlinearity (raw FG update is stronger; nu>=3 forecloses)
         asym=0.3,          # < 02's 0.5: tunneling-erase vs injection-program are more asymmetric
-        n_levels=32,       # ~5-bit programming granularity (02 showed ~4-bit suffices via nu->0)
+        n_levels=256,      # ~8-bit closed-loop programming precision (Hasler FG reaches 10-14 bit w/ feedback)
         sigma_write=0.03,  # cycle-to-cycle injection variability (~02's 0.02, slightly higher)
         sigma_read=SIGMA_FG,
         drift=0.0,         # FG charge retention is years -> no decay over a training run
@@ -42,11 +47,11 @@ def fg_device_config():
 
 # One-at-a-time Observed robustness sweeps around the nominal (keys are DeviceConfig field names).
 FG_SWEEPS = {
-    "nonlin":      [2.0, 3.0, 4.0],
-    "asym":        [0.2, 0.3, 0.5],
-    "n_levels":    [16, 32, 64],
-    "sigma_write": [0.02, 0.03, 0.05],
-    "sigma_read":  [0.003, 0.01, 0.02],
+    "nonlin":      [0.0, 1.0, 2.0, 3.0],      # KEY axis: 0 = nu->0 co-design limit (learns); >=3 raw FG (forecloses)
+    "asym":        [0.2, 0.3, 0.5, 1.0],      # 1.0 = symmetric
+    "n_levels":    [32, 64, 128, 256, 512],   # programming-precision cliff around the nominal
+    "sigma_write": [0.02, 0.03, 0.05, 0.1],
+    "sigma_read":  [0.003, 0.01, 0.02, 0.05],
 }
 
 # Read-averaging factors K for the robust-in-fabric search (objective 2). Ascending, starts at 1.

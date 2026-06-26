@@ -74,6 +74,7 @@ def test_transfer_forecloses_when_half_rule_dies():
     res = classify_transfer(snr_half=0.4, snr_full=0.0, snr_robust=0.0,
                             writes_per_cell=300, endurance_budget=100_000, robust_reads_K=10_000)
     assert res["status"] == "FORECLOSE"
+    assert res["endurance_ok"] is True   # foreclosed by SNR, not by endurance
 
 
 def test_transfer_forecloses_when_endurance_blown_even_if_half_passes():
@@ -87,6 +88,8 @@ def test_transfer_boundary_in_between():
     res = classify_transfer(snr_half=2.0, snr_full=0.0, snr_robust=0.0,
                             writes_per_cell=300, endurance_budget=100_000, robust_reads_K=1)
     assert res["status"] == "BOUNDARY"
+    assert res["endurance_ok"] is True
+    assert res["provisional"] is True
 
 
 def test_transfer_records_elevated_in_fabric_verdicts():
