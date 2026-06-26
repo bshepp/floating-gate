@@ -5,13 +5,19 @@
 array** — the device family that stores an analog weight as non-volatile charge on an
 isolated gate and updates it by a *physical* tunneling / hot-carrier injection event.
 
-**Created:** 2026-06-24. **Status:** Phase 0 (the H5 sim gate) **ran 2026-06-24 → PASS (provisional)**
-on the buildable half-co-located rule (`snr_half=15.4 ≥ 3` at `σ_fg=0.01`); the genuinely in-fabric
-two-read rule **forecloses** at `σ_fg` (the read-noise-robust rule is not in-fabric). Read noise is
-not the wall — the decision shifts to **Phase 1** (device access + the write side). See
-`docs/superpowers/findings/2026-06-24-phase0-h5-readnoise-findings.md`. **Aspirational / trailing:** no
-floating-gate device is owned or buyable (see below), so the operating point is provisional and
-nothing is built until access is secured.
+**Created:** 2026-06-24. **Status:** Phase 0 + Phase 1 sim gates run (provisional).
+**Phase 0** (H5 read-noise, 2026-06-24) → **PASS** on the buildable half-co-located rule; the in-fabric
+two-read rule forecloses on read noise. **Phase 1** (transfer gate at FG-realistic write-side params,
+2026-06-25) → **PASS (inference-grade)**: the buildable rule learns at a high-precision closed-loop FG
+operating point (`snr_half=10.9`, endurance fine), so a tapeout is *earned for an FG inference
+accelerator* — but the genuinely in-fabric rule **forecloses** (on both read noise *and* the FG write
+side; multi-read averaging cannot rescue it), so **in-fabric learning is not achieved**. The binding
+non-ideality is the FG **update nonlinearity**, not precision/retention (ν=3 forecloses even at infinite
+precision; ν→0 co-design or closed-loop compensation required). The next move is the open
+*read-noise-robust **in-fabric** update* problem (or a characterization tapeout to confirm the
+provisional params). See `docs/superpowers/findings/2026-06-25-phase1-transfer-sim-gate-findings.md`.
+**Aspirational / trailing:** no floating-gate device is owned or buyable (see below), so the operating
+point is provisional and nothing is built until access is secured.
 
 ## The three crossbar cousins (and why only two can learn)
 
