@@ -6,17 +6,26 @@ Guidance for Claude Code when working in `08-floating-gate`.
 
 The **floating-gate hardware-transfer arm of `02-memristive-crossbar`** — toward a genuine
 analog floating-gate array that learns with the update kept *in the fabric* (charge written by
-tunneling / hot-carrier injection). It is the *aspirational* cousin of the buyable memristor
-arm (`06-crossbar-build`) and the in-fabric-capable counterpart of the switched-capacitor FPAA
-(`fpaa-neural-net`, which is inference-only). Read `README.md` and the design spec in
+tunneling / hot-carrier injection). It is the cousin of the buyable memristor arm
+(`06-crossbar-build`) and the in-fabric-capable counterpart of the switched-capacitor FPAA
+(`fpaa-neural-net`, which is inference-only). Read `README.md` and the design specs in
 `docs/superpowers/specs/` before doing anything.
+
+**Access status (2026-11-05):** a floating-gate array is now buyable — Okika Devices sells the
+Georgia Tech / Hasler SoC FPAA as the **OTC2902K** ($2,499 list). The frozen `classify_access`
+says BUY for the *characterization* job, with an inference-grade `(cpu, physical)` audit ceiling as
+sold; whether the part supports a fabric-triggered run-mode write is an open vendor question.
+**Nothing has been bought.** Okika's cheaper **FlexAnalog** boards are the Anadigm AN231E04
+switched-cap part — not floating gates; never substitute them.
 
 ## The two hard rules
 
-1. **Sim gate before device access.** Do not pursue a floating-gate array (FG-FPAA
+1. **Sim gate before device access.** Do not pursue a floating-gate array (purchase, FG-FPAA
    collaboration or MPW run) until Phase 0 (the H5 read-noise sweep, reusing `02`'s sim)
-   classifies PASS through the *frozen* `verdict.py`. The operating point `σ_fg` is provisional
-   until a real device confirms it.
+   classifies PASS through the *frozen* `verdict.py` — done — and do not spend money until the
+   frozen `classify_access` reads BUY **and the user ratifies `ACCESS_BUDGET_USD`**. The operating
+   point is provisional until a real device confirms it (`fg_measured.py` + `transfer_sweep.py
+   --measured` is that path).
 2. **The update must stay in the fabric.** The intended update is a floating-gate charge
    write. If a host PC computes the gradient and merely sets the charge, that is **inference,
    not learning** and fails the verdict — the exact failure that disqualified the switched-cap
