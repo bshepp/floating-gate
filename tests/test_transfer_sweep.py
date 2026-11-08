@@ -74,6 +74,8 @@ def test_main_measured_flag_runs_confirmed(tmp_path):
                                  "sigma_write": 0.02, "drift": 0.0,
                                  "prog_rms_error": rms_error_from_levels(256)}))
     out = tmp_path / "t.json"
-    res = main(["--quick", "--measured", str(mfile), "--write-mode", "open_loop", "--out", str(out)])
+    res = main(["--quick", "--measured", str(mfile), "--write-mode", "open_loop", "--differential",
+                "--out", str(out)])
     assert res["verdict"]["provisional"] is False
     assert res["nominal_cfg"]["n_levels"] == 0 and res["nominal_cfg"]["nonlin"] == 3.0
+    assert res["nominal_cfg"]["asym"] == 1.0                      # --differential forces symmetric

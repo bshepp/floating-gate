@@ -170,13 +170,16 @@ def main(argv=None):
                          "re-runs the frozen gate at the MEASURED DeviceConfig with params_confirmed=True")
     ap.add_argument("--write-mode", default="closed_loop", choices=["closed_loop", "open_loop"],
                     help="with --measured: which write mode the learner uses (see fg_measured)")
+    ap.add_argument("--differential", action="store_true",
+                    help="with --measured: injection-only part, weight is a differential pair (asym -> 1)")
     args = ap.parse_args(argv)
 
     extra = {}
     if args.measured:
         with open(args.measured) as fp:
             m = json.load(fp)
-        cfg = device_config_from_measurements(m, write_mode=args.write_mode)
+        cfg = device_config_from_measurements(m, write_mode=args.write_mode,
+                                              differential_pair=args.differential)
         extra = dict(cfg=cfg, sigma_fg=cfg.sigma_read, params_confirmed=True)
 
     if args.quick:

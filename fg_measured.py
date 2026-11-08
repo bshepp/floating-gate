@@ -162,7 +162,8 @@ def device_config_from_measurements(m, write_mode="closed_loop", base=None, diff
     if write_mode == "closed_loop":
         if "prog_rms_error" not in m:
             raise KeyError("closed_loop needs prog_rms_error")
-        nonlin = float(m.get("nonlin_effective", m["nonlin_raw"]))
+        ne = m.get("nonlin_effective")                 # None (template placeholder) == absent
+        nonlin = float(m["nonlin_raw"] if ne is None else ne)
         n_levels = levels_from_rms_error(m["prog_rms_error"])
     elif write_mode == "open_loop":
         nonlin = float(m["nonlin_raw"])
@@ -171,11 +172,32 @@ def device_config_from_measurements(m, write_mode="closed_loop", base=None, diff
         raise ValueError(f"unknown write_mode {write_mode!r}")
     return DeviceConfig(
         g_min=base.g_min, g_max=base.g_max,
-        dG0=float(m.get("dG0", base.dG0)),
+        dG0=float(base.dG0 if m.get("dG0") is None else m["dG0"]),
         nonlin=nonlin, asym=asym, n_levels=int(n_levels),
         sigma_write=float(m["sigma_write"]), sigma_read=float(m["sigma_read"]),
         drift=float(m["drift"]),
     )
+
+
+def measurement_template():
+    """The JSON a bench session fills in for `transfer_sweep.py --measured`: every key the assembly reads,
+    with the protocol row that produces it. Values are None until measured; `prog_rms_error` is only needed
+    for closed_loop, `nonlin_effective` is optional, `dG0` optional. Fractions of the chosen span throughout."""
+    return {
+        "_span_definition": "I_min, I_max of the learner's FG current window (A); all fractions are of I_max-I_min",
+        "I_min": None, "I_max": None,
+        "sigma_read": None,          # row 'read noise'
+        "nonlin_raw": None,          # row 'open-loop potentiation ladder'
+        "dG0": None,                 # row 'open-loop potentiation ladder' (optional; default 02's 0.05)
+        "asym": 1.0,                 # row 'per-cell depression test' (1.0 if injection-only -> differential pair)
+        "sigma_write": None,         # row 'cycle-to-cycle'
+        "prog_rms_error": None,      # row 'closed-loop landing error' (closed_loop only)
+        "nonlin_effective": None,    # row 'closed-loop landing error' (optional)
+        "drift": 0.0,                # row 'retention' (FG: expect ~0 over a run)
+        "renorm_sigma": None,        # row 'global erase + re-inject cycle' (fg_diffpair)
+        "endurance_cycles": None,    # row 'endurance' (program/erase rating)
+        "run_mode_local_write": False,   # row 'run-mode local write' (False by identity, 2026-11-08)
+    }
 
 
 # The bench protocol, one row per DeviceConfig input (what to measure, how, and which field it feeds).

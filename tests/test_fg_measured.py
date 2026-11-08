@@ -1,5 +1,6 @@
 """fg_measured: each inversion recovers the parameter that generated synthetic data from the VENDORED
 device model (round-trips through vendor_02/memristor.py), plus the assembly + protocol table."""
+import json
 import math
 
 import numpy as np
@@ -7,7 +8,7 @@ import pytest
 
 from memristor import DeviceConfig, apply_pulse, apply_drift, read_conductance
 from fg_measured import (
-    rms_error_from_levels, levels_from_rms_error, levels_from_bits, bits_from_levels,
+    measurement_template, rms_error_from_levels, levels_from_rms_error, levels_from_bits, bits_from_levels,
     nonlin_from_pot_steps, nonlin_from_dep_steps, dG0_from_pot_step, asym_from_steps,
     sigma_write_from_step_std, sigma_read_from_std, drift_from_retention,
     device_config_from_measurements, REQUIRED_MEASUREMENTS, CHARACTERIZATION_PROTOCOL,
@@ -168,3 +169,13 @@ def test_protocol_covers_every_device_input():
     assert "global erase + re-inject cycle" in names   # injection-only parts need the maintenance op
     assert "per-cell depression test" in names
     assert all({"name", "feeds", "procedure"} <= set(r) for r in CHARACTERIZATION_PROTOCOL)
+
+
+def test_measurement_template_covers_assembly_inputs_and_round_trips_json():
+    t = measurement_template()
+    assert set(REQUIRED_MEASUREMENTS) <= set(t) and "prog_rms_error" in t
+    assert json.loads(json.dumps(t)) == t
+    filled = {**t, "sigma_read": 0.005, "nonlin_raw": 3.0, "sigma_write": 0.02,
+              "prog_rms_error": rms_error_from_levels(512)}
+    cfg = device_config_from_measurements(filled, "closed_loop", differential_pair=True)
+    assert cfg.asym == 1.0 and cfg.n_levels == 512
