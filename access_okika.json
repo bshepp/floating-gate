@@ -11,17 +11,17 @@
         "budget_usd": 5000.0,
         "within_budget": true,
         "fg_programming_user_exposed": true,
-        "run_mode_local_write": null,
+        "run_mode_local_write": false,
         "audit_ceiling": "(cpu, physical)",
-        "in_fabric_path": "unknown",
+        "in_fabric_path": "mpw",
         "replaces_characterization_tapeout": true,
-        "vendor_query_needed": true
+        "vendor_query_needed": false
       },
       "evidence": {
         "is_floating_gate": "secondary: vendor describes FG analog memory; chip matches George et al. TVLSI 2016 SoC FPAA (FG-programmed, MSP430, 350 nm)",
         "price_usd": "secondary: okikadevices.com list price; distributor prices higher; academic pricing offered on request (unquantified)",
-        "fg_programming_user_exposed": "secondary: open Scilab/Xcos + x2c toolchain emits an FG programming file; FG programming 'entirely on the device as an input data stream'; Hasler calibration papers program individual FG current sources to arbitrary targets over 6 decades. CONFIRM an individual-target API exists in the Okika release.",
-        "run_mode_local_write": "unknown: on the published RASP infrastructure an FG is switched OUT of the circuit onto a programming drain line for injection (program mode) and the only published learning on the SoC FPAA computes weight updates digitally on the on-chip MSP430 (Shah & Hasler, JETCAS 2018). Evidence points to False; not confirmed from the datasheet."
+        "fg_programming_user_exposed": "primary-by-identity (user, 2026-11-08: the chip is the published RASP 3.0 design unchanged): the published infrastructure programs every FG individually to arbitrary targets and reads it back (Kim, Shah, Hasler, TVLSI 2017 programs single FG current sources over 6 decades); the routines ship in the Georgia Tech open toolset that Okika redistributes as a VM.",
+        "run_mode_local_write": "primary-by-identity (same premise): on the published design injection happens only in PROGRAM mode -- the FG pFET drain is switched off the circuit onto the programming line and the array supply is raised above the run-mode rail to reach hot-electron-injection conditions; those switches belong to the programming infrastructure, not to any CAB signal. The chip's one published learning demo computes updates on the MSP430 and programs through that infrastructure (Shah & Hasler, JETCAS 2018). -> False. Corollary recorded for the write model: injection is the only per-cell mechanism (it RAISES pFET current); tunneling erase is global."
       }
     },
     {

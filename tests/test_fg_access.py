@@ -13,13 +13,14 @@ def test_every_input_carries_an_evidence_grade():
         assert all(c["evidence"].values())
 
 
-def test_otc2902k_record_is_buy_with_inference_grade_ceiling_and_open_vendor_question():
+def test_otc2902k_record_is_buy_with_inference_grade_ceiling_and_mpw_in_fabric_path():
     r = access_record(OKIKA_OTC2902K)
     v = r["verdict"]
     assert v["status"] == "BUY"
-    assert v["audit_ceiling"] == "(cpu, physical)"      # as sold; in-fabric NOT established
-    assert v["in_fabric_path"] == "unknown"
-    assert v["vendor_query_needed"] is True
+    assert v["audit_ceiling"] == "(cpu, physical)"      # as sold: program-mode writes under the MSP430
+    assert v["in_fabric_path"] == "mpw"                  # 2026-11-08: run-mode local write = False
+    assert v["vendor_query_needed"] is False
+    assert "primary-by-identity" in r["evidence"]["run_mode_local_write"]
 
 
 def test_flexanalog_is_the_negative_control():

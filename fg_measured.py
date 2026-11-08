@@ -16,6 +16,14 @@ Two write modes, because the Phase-1 findings showed they differ decisively (raw
                option for an in-fabric, fabric-triggered write): the learner sees the RAW nonlinearity
                and the pulse's own granularity (no quantizer).
 All quantities are normalized: G and errors as fractions of the chosen conductance (current) span.
+
+Injection-only parts (the RASP / OTC2902 family, 2026-11-08): hot-electron injection is the only per-cell
+mechanism and it only RAISES the pFET current; tunneling erase is global. A single cell therefore has no
+per-cell depression and `asym` is the wrong abstraction. The device-faithful weight is a DIFFERENTIAL PAIR
+w = I+ - I-: "depress" = inject the minus cell. Both directions are then the same mechanism (asym -> 1.0),
+cells only grow between global erases, and the erase + re-inject cycle (not pulses per cell) is what the
+endurance budget counts. `device_config_from_measurements(..., differential_pair=True)` applies the
+asym -> 1.0 mapping; fg_diffpair.py (Phase 1c) simulates the pair itself.
 08-authored; never edits vendor_02/.
 """
 import math
@@ -133,7 +141,7 @@ def drift_from_retention(G0, Gt, n_epochs, G_rest=0.5):
 REQUIRED_MEASUREMENTS = ("sigma_read", "nonlin_raw", "asym", "sigma_write", "drift")
 
 
-def device_config_from_measurements(m, write_mode="closed_loop", base=None):
+def device_config_from_measurements(m, write_mode="closed_loop", base=None, differential_pair=False):
     """Build the DeviceConfig a learner would see on the measured array.
 
     m: dict of normalized measurements -- REQUIRED_MEASUREMENTS plus, for closed_loop,
@@ -141,11 +149,16 @@ def device_config_from_measurements(m, write_mode="closed_loop", base=None):
        `nonlin_effective` (post-verify nonlinearity; defaults to nonlin_raw, the conservative choice).
        Optional `dG0` overrides the nominal step. `base` seeds g_min/g_max (default: 02's defaults).
     write_mode: "closed_loop" (effective nu + landing-error quantizer) or "open_loop" (raw nu, no
-       quantizer) -- see module docstring."""
+       quantizer) -- see module docstring.
+    differential_pair: the weight is I+ - I- on an injection-only part, so both update directions are
+       the same mechanism -> asym is forced to 1.0 (the measured `asym` is ignored; on such a part it is
+       not measurable per cell anyway). The pair's own dynamics (saturation, global erase) are NOT in a
+       single DeviceConfig; fg_diffpair simulates them."""
     missing = [k for k in REQUIRED_MEASUREMENTS if k not in m]
     if missing:
         raise KeyError(f"missing measurements: {missing}")
     base = DeviceConfig() if base is None else base
+    asym = 1.0 if differential_pair else float(m["asym"])
     if write_mode == "closed_loop":
         if "prog_rms_error" not in m:
             raise KeyError("closed_loop needs prog_rms_error")
@@ -159,7 +172,7 @@ def device_config_from_measurements(m, write_mode="closed_loop", base=None):
     return DeviceConfig(
         g_min=base.g_min, g_max=base.g_max,
         dG0=float(m.get("dG0", base.dG0)),
-        nonlin=nonlin, asym=float(m["asym"]), n_levels=int(n_levels),
+        nonlin=nonlin, asym=asym, n_levels=int(n_levels),
         sigma_write=float(m["sigma_write"]), sigma_read=float(m["sigma_read"]),
         drift=float(m["drift"]),
     )
@@ -177,9 +190,21 @@ CHARACTERIZATION_PROTOCOL = (
     {"name": "open-loop potentiation ladder", "feeds": "nonlin_raw, dG0",
      "procedure": "From G~0, apply identical injection pulses one at a time, reading after each; fit "
                   "step vs G to dG0*(1-G)**nu (nonlin_from_pot_steps / dG0_from_pot_step)."},
-    {"name": "open-loop depression ladder", "feeds": "asym (and a second nu estimate)",
-     "procedure": "From G~1, apply identical tunneling/erase steps; asym_from_steps at matched G. "
-                  "NOTE: if erase is global on the part, record that -- it is itself a write-side wall."},
+    {"name": "per-cell depression test", "feeds": "asym (single cell) OR differential_pair=True",
+     "procedure": "Try to LOWER one cell's current without touching its neighbours. On the RASP / OTC2902 "
+                  "family this is expected to be impossible (tunneling erase is global; injection only "
+                  "raises current): record 'injection-only', set differential_pair=True (asym -> 1.0) and "
+                  "skip the depression ladder. If per-cell decrement exists, run the mirror ladder from "
+                  "G~1 and use asym_from_steps at matched G."},
+    {"name": "differential-pair ladder", "feeds": "nonlin_raw of the MINUS cell (consistency), dG0",
+     "procedure": "Program a pair; inject the minus cell from G~0 one pulse at a time, reading I+ - I-; "
+                  "the step-vs-G fit must match the plus-cell ladder (same mechanism). A mismatch is a "
+                  "pair-mismatch term to record."},
+    {"name": "global erase + re-inject cycle", "feeds": "renorm_sigma, erase cost (fg_diffpair)",
+     "procedure": "Erase the array (tunneling), closed-loop re-inject every pair to its retained "
+                  "differential value with the smaller cell at G~0; renorm_sigma = RMS (landed - "
+                  "target)/span over all pairs; record wall-clock per cycle. This is the maintenance op an "
+                  "injection-only learner needs when cells run out of headroom."},
     {"name": "cycle-to-cycle", "feeds": "sigma_write",
      "procedure": ">=30 repeats of (program to mid-span, one nominal pulse, read); "
                   "sigma_write = std(step)/dG0."},
@@ -192,9 +217,12 @@ CHARACTERIZATION_PROTOCOL = (
                   "drift_from_retention per epoch-equivalent."},
     {"name": "endurance", "feeds": "ENDURANCE_BUDGET",
      "procedure": "Vendor/datasheet program-erase cycle rating, or cycle a sacrificial cell until the "
-                  "step size degrades by 2x; compare to writes_per_cell."},
+                  "step size degrades by 2x. On an injection-only part compare it to the number of GLOBAL "
+                  "ERASE cycles per training run (fg_diffpair counts them), not to pulses per cell: the "
+                  "tunneling oxide sees one stress per erase."},
     {"name": "run-mode local write", "feeds": "classify_access.run_mode_local_write",
      "procedure": "Can a CAB-local analog signal drive injection on a weight FG while in run mode, with "
-                  "no program-mode switch and no microprocessor in the loop? Yes/No from the datasheet "
-                  "or a bench test. This decides the in-fabric path, not the purchase."},
+                  "no program-mode switch and no microprocessor in the loop? Answered False for the "
+                  "OTC2902E04 by identity with the published design (2026-11-08); a bench confirmation is "
+                  "cheap once the board is in hand. This decides the in-fabric path, not the purchase."},
 )

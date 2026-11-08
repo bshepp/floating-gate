@@ -2,8 +2,13 @@
 per input, for the two Okika Devices product lines (2026-11-05). Outcomes recorded, not asserted.
 Sources + verification status live in docs/superpowers/findings/2026-11-05-phase1b-okika-access-findings.md.
 
-Evidence grades: "primary" (datasheet / primary paper read), "secondary" (vendor page, press, search
-summaries of the primary), "unknown" (not established; the input is None)."""
+Evidence grades: "primary" (datasheet / primary paper read), "primary-by-identity" (the user confirms the
+part is the published design unchanged, so the papers' statements transfer), "secondary" (vendor page,
+press, search summaries of the primary), "unknown" (not established; the input is None).
+
+2026-11-08: run_mode_local_write flipped None -> False on the user's confirmation that the OTC2902E04 is the
+RASP 3.0 design of the papers unchanged. in_fabric_path therefore reads "mpw": the in-fabric (physical,
+physical) write needs a custom cell; the board as sold is the inference-grade (cpu, physical) host."""
 import argparse
 import json
 
@@ -18,23 +23,28 @@ OKIKA_OTC2902K = {
         "is_floating_gate": True,
         "price_usd": 2499.0,
         "fg_programming_user_exposed": True,
-        "run_mode_local_write": None,
+        "run_mode_local_write": False,
     },
     "evidence": {
         "is_floating_gate": "secondary: vendor describes FG analog memory; chip matches George et al. "
                             "TVLSI 2016 SoC FPAA (FG-programmed, MSP430, 350 nm)",
         "price_usd": "secondary: okikadevices.com list price; distributor prices higher; academic "
                      "pricing offered on request (unquantified)",
-        "fg_programming_user_exposed": "secondary: open Scilab/Xcos + x2c toolchain emits an FG "
-                                       "programming file; FG programming 'entirely on the device as an "
-                                       "input data stream'; Hasler calibration papers program individual "
-                                       "FG current sources to arbitrary targets over 6 decades. "
-                                       "CONFIRM an individual-target API exists in the Okika release.",
-        "run_mode_local_write": "unknown: on the published RASP infrastructure an FG is switched OUT of "
-                                "the circuit onto a programming drain line for injection (program mode) "
-                                "and the only published learning on the SoC FPAA computes weight updates "
-                                "digitally on the on-chip MSP430 (Shah & Hasler, JETCAS 2018). Evidence "
-                                "points to False; not confirmed from the datasheet.",
+        "fg_programming_user_exposed": "primary-by-identity (user, 2026-11-08: the chip is the published "
+                                       "RASP 3.0 design unchanged): the published infrastructure programs "
+                                       "every FG individually to arbitrary targets and reads it back (Kim, "
+                                       "Shah, Hasler, TVLSI 2017 programs single FG current sources over 6 "
+                                       "decades); the routines ship in the Georgia Tech open toolset that "
+                                       "Okika redistributes as a VM.",
+        "run_mode_local_write": "primary-by-identity (same premise): on the published design injection "
+                                "happens only in PROGRAM mode -- the FG pFET drain is switched off the "
+                                "circuit onto the programming line and the array supply is raised above "
+                                "the run-mode rail to reach hot-electron-injection conditions; those "
+                                "switches belong to the programming infrastructure, not to any CAB signal. "
+                                "The chip's one published learning demo computes updates on the MSP430 and "
+                                "programs through that infrastructure (Shah & Hasler, JETCAS 2018). -> False. "
+                                "Corollary recorded for the write model: injection is the only per-cell "
+                                "mechanism (it RAISES pFET current); tunneling erase is global.",
     },
 }
 

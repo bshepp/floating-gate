@@ -144,6 +144,12 @@ def test_closed_loop_defaults_effective_to_raw_conservatively():
     assert device_config_from_measurements(m, "closed_loop").nonlin == 3.2
 
 
+def test_differential_pair_forces_symmetric_updates():
+    cfg = device_config_from_measurements(_M, "open_loop", differential_pair=True)
+    assert cfg.asym == 1.0 and cfg.nonlin == 3.2
+    assert device_config_from_measurements(_M, "open_loop").asym == 0.4
+
+
 def test_assembly_validation():
     with pytest.raises(KeyError):
         device_config_from_measurements({k: _M[k] for k in REQUIRED_MEASUREMENTS[1:]})
@@ -158,4 +164,7 @@ def test_protocol_covers_every_device_input():
     for field in ("sigma_read", "nonlin_raw", "asym", "sigma_write", "n_levels", "drift"):
         assert field in feeds
     assert "run_mode_local_write" in feeds          # the in-fabric question is on the bench list
+    names = [r["name"] for r in CHARACTERIZATION_PROTOCOL]
+    assert "global erase + re-inject cycle" in names   # injection-only parts need the maintenance op
+    assert "per-cell depression test" in names
     assert all({"name", "feeds", "procedure"} <= set(r) for r in CHARACTERIZATION_PROTOCOL)
