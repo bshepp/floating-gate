@@ -21,7 +21,11 @@ the Georgia Tech / Hasler floating-gate SoC FPAA (RASP 3.0 lineage) as the **OTC
 The frozen `classify_access` reads **BUY** for the characterization job (it replaces the characterization
 tapeout) with an **inference-grade audit ceiling** `(cpu, physical)` — as published, FG writes go through
 program mode under the on-chip MSP430, so in-fabric learning is *not* established by the purchase; the
-run-mode local-write question is open with the vendor. **Nothing bought yet.** Beware the same vendor's
+run-mode local write is **not** available on the published design (answered 2026-11-08 by identity with
+the papers: injection is program-mode only, under the programming infrastructure), so the in-fabric path is a
+custom cell (MPW) and the board is the characterization instrument + inference-grade host. The family is
+**injection-only with global erase**, so the device-faithful weight is a differential pair (Phase 1c,
+`fg_diffpair.py`). **Nothing bought yet.** Beware the same vendor's
 FlexAnalog boards: they are the Anadigm AN231E04 switched-cap part, not floating gates. See
 `docs/superpowers/findings/2026-11-05-phase1b-okika-access-findings.md`.
 
@@ -88,7 +92,7 @@ A clean **FORECLOSE at any gate is a valid, money-saving end.** Verdicts are fro
   endurance, retention) — re-sim at measured parameters, classify transfer.
   **Phase 1b (access, 2026-11-05):** `classify_access` frozen before any purchase — BUY iff floating
   gate ∧ FG programming user-exposed ∧ price ≤ pre-registered budget; records the audit ceiling the
-  board can host as sold. Run on the Okika OTC2902K → BUY, ceiling `(cpu, physical)`, vendor query open.
+  board can host as sold. Run on the Okika OTC2902K → BUY, ceiling `(cpu, physical)`, in-fabric path `mpw`.
 - **Phase 2 — build (only on Phase-1 PASS).** Program the half-co-located learner on the
   floating-gate array; demonstrate parity-3 / XOR learned **in-fabric**, audited on both axes.
 

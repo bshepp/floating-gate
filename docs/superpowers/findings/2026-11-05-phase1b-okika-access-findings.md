@@ -1,6 +1,6 @@
 # Findings — Phase 1b: device access — Okika sells the Georgia Tech floating-gate SoC FPAA
 
-**Date:** 2026-11-05
+**Date:** 2026-11-05 · **Addendum:** 2026-11-08 (§Addendum: the vendor questions answered by identity with the papers)
 **Scope:** the access half of Phase 1 of `08-floating-gate`. The user reported that the floating-gate FPAA
 boards from the academic papers are now commercially available from Okika; this note records what was
 verified, runs the **frozen** `classify_access` (`verdict.py`, committed before any purchase) on the observed
@@ -171,3 +171,45 @@ The JETCAS 2018 full text was not read; "updates computed on the MSP430" is from
 - Hasler, VTS 2022 special session: https://hasler.ece.gatech.edu/SoCFPAA/VTS2022_Hasler.pdf ·
   Twigg PhD 2006: https://hasler.ece.gatech.edu/Courses/ECE6435/theses/twigg_christopher_m_200608_phd.pdf
 - Okika GitHub (naming): https://github.com/OkikaTechnologies/FPAASonar
+
+---
+
+## Addendum (2026-11-08) — the two vendor questions, answered by identity with the published design
+
+### Observed
+
+- The user states the OTC2902E04 is the exact RASP 3.0 design of the papers, unchanged (user statement;
+  not independently verified against an Okika datasheet in this session).
+- On the published design (George et al. 2016; Kim, Shah, Hasler 2017; Twigg 2006; Hasler VTS 2022):
+  every FG is programmed individually to an arbitrary target with read-back by the on-chip infrastructure;
+  injection happens in **program mode** only — the FG pFET drain is switched off the circuit onto the
+  programming line and the array supply is raised above the run-mode rail to reach injection conditions;
+  those switches belong to the programming infrastructure. Hot-electron injection is the selective per-cell
+  mechanism and **raises** pFET current; tunneling erase is **global**.
+- `fg_access.py` updated: `fg_programming_user_exposed=True` (grade primary-by-identity),
+  `run_mode_local_write=False` (same grade). `access_okika.json` regenerated: **BUY**, `audit_ceiling=(cpu,
+  physical)`, `in_fabric_path="mpw"`, `vendor_query_needed=False`.
+
+### Interpretation
+
+1. **Question 1 (individual-FG access): yes.** The characterization job is fully supported; the BUY stands
+   on firmer evidence.
+2. **Question 2 (run-mode local write): no.** The in-fabric `(physical, physical)` write is not available on
+   this part as sold. The in-fabric path is a custom cell (MPW). The board is the inference-grade host and
+   the characterization instrument, nothing more — and that is enough to earn it.
+3. **Per-cell depression does not exist on this family.** A single cell can only be potentiated; the array
+   is erased together. The device-faithful weight is a **differential pair** (`w = I+ − I−`): depress =
+   inject the minus cell. Consequences, now in the protocol (`fg_measured.py`): `asym → 1.0`
+   (`differential_pair=True`); cells only grow between **global erase + re-inject** cycles, which is the
+   maintenance op the endurance budget must count; the depression ladder is replaced by a per-cell
+   depression *test* plus a minus-cell ladder.
+4. **A new, testable hypothesis follows.** With frequent renormalization both cells of a pair sit near the
+   bottom of their range, where the raw update factor `(1−G)^ν ≈ 1` — the differential pair may
+   **linearize the raw nonlinearity** that foreclosed the single-cell model at ν ≥ 3. That is Phase 1c
+   (`fg_diffpair.py`, pre-registered before the run).
+
+### Caveat
+
+The identity claim is the user's; the mechanism statements are from the published RASP infrastructure
+papers as summarized (not primary-read here). A bench confirmation of "no run-mode injection" costs minutes
+once the board is in hand and should be the first thing done with it.
