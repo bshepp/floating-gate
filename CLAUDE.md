@@ -16,7 +16,8 @@ Georgia Tech / Hasler SoC FPAA as the **OTC2902K** ($2,499 list). The frozen `cl
 says BUY for the *characterization* job, with an inference-grade `(cpu, physical)` audit ceiling as
 sold; the part has **no run-mode fabric-triggered write** (injection is program-mode only, by identity
 with the published RASP 3.0 design, 2026-11-08), so the in-fabric path is a custom cell (MPW). The family is
-injection-only with global erase: model weights as differential pairs. **Nothing has been bought.** Okika's cheaper **FlexAnalog** boards are the Anadigm AN231E04
+injection-only with global erase: model weights as differential pairs (`fg_diffpair.py`; Phase 1c PASS at
+raw ν=3 for the inference-grade half rule, in-fabric still forecloses). **Nothing has been bought.** Okika's cheaper **FlexAnalog** boards are the Anadigm AN231E04
 switched-cap part — not floating gates; never substitute them.
 
 ## The two hard rules

@@ -25,7 +25,12 @@ run-mode local write is **not** available on the published design (answered 2026
 the papers: injection is program-mode only, under the programming infrastructure), so the in-fabric path is a
 custom cell (MPW) and the board is the characterization instrument + inference-grade host. The family is
 **injection-only with global erase**, so the device-faithful weight is a differential pair (Phase 1c,
-`fg_diffpair.py`). **Nothing bought yet.** Beware the same vendor's
+`fg_diffpair.py`). **Phase 1c** (2026-11-08, pre-registered H6): the injection-only **differential-pair** learner
+**PASSes at raw ν=3** (SNR 7.9) where the single-cell model foreclosed (0.2) — so an open-loop single-pulse
+learner is viable on this family (inference-grade); the win comes from cells starting at the bottom of range with
+a device-set annealing decay, *not* from renormalization (0 erases at the nominal); the raw-ν cliff moves to
+ν≈5; the in-fabric two-read rule still forecloses. See
+`docs/superpowers/findings/2026-11-08-phase1c-diffpair-injection-only-findings.md`. **Nothing bought yet.** Beware the same vendor's
 FlexAnalog boards: they are the Anadigm AN231E04 switched-cap part, not floating gates. See
 `docs/superpowers/findings/2026-11-05-phase1b-okika-access-findings.md`.
 
@@ -112,12 +117,15 @@ fg_params.py      # pre-registered (provisional) FG operating point + sweeps
 fg_rules.py       # read-averaging model + endurance write-count
 fg_measured.py    # bench measurements -> vendored DeviceConfig (+ CHARACTERIZATION_PROTOCOL)
 fg_access.py      # observed Okika inputs through classify_access -> access_okika.json
+fg_diffpair.py    # Phase-1c injection-only differential-pair learner -> diffpair_parity3.json
+measurements_template.json  # what the bench fills in for transfer_sweep.py --measured
 h5_sweep.py       # Phase-0 runner -> h5_sweep_parity3.json
 transfer_sweep.py # Phase-1 runner -> transfer_parity3.json (--measured re-runs on a real device)
 vendor_02/        # 02's sim, vendored verbatim
 tests/            # one pytest module per source module; the verdicts are brute-forced
 docs/superpowers/
-  specs/          # design specs (2026-06-24, 06-25, 11-05)
+  specs/          # design specs (2026-06-24, 06-25, 11-05, 11-08)
+  plans/          # runner plans + the Okika pre-purchase checklist (11-08)
   findings/       # Observed / Interpretation, filled as phases run
 ```
 
