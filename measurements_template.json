@@ -1,0 +1,16 @@
+{
+  "_span_definition": "I_min, I_max of the learner's FG current window (A); all fractions are of I_max-I_min",
+  "I_min": null,
+  "I_max": null,
+  "sigma_read": null,
+  "nonlin_raw": null,
+  "dG0": null,
+  "asym": 1.0,
+  "sigma_write": null,
+  "prog_rms_error": null,
+  "nonlin_effective": null,
+  "drift": 0.0,
+  "renorm_sigma": null,
+  "endurance_cycles": null,
+  "run_mode_local_write": false
+}

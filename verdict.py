@@ -5,9 +5,17 @@ statistics, with thresholds + operating point fixed *in this file, committed, be
 run*. A reviewer can brute-force its input space (see tests/test_verdict.py). The verdict
 NEVER reads the raw sweep; it classifies the sweep's reported numbers.
 
-Only `classify_h5` (Phase 0) is frozen now. The Phase-1 / Phase-2 verdicts will be frozen
-here before those phases run, once the floating-gate device-characterization protocol is
-fixed.
+`classify_h5` (Phase 0) and `classify_transfer` (Phase 1) are frozen. `classify_access`
+(Phase 1b, the device-access gate) was frozen 2026-11-05 BEFORE any purchase. `classify_build`
+(Phase 2) is frozen only once the build protocol is fixed.
+
+Access correction (2026-11-05). The "not buyable" premise below was true when written. Since
+2025 Okika Devices sells the Georgia Tech / Hasler floating-gate SoC FPAA (RASP 3.0 lineage) as
+the OTC2902K development board, so a floating-gate array IS now purchasable; what remains open
+is whether that part can host the genuinely in-fabric (physical, physical) update or only the
+inference-grade (cpu, physical) one. `classify_access` records exactly that split. Beware the
+same vendor's FlexAnalog boards: they are the Anadigm AN231E04 switched-capacitor part — the
+device already classified inference-only by `fpaa-neural-net` — not floating gates.
 
 Operating point. 08 is the *aspirational* floating-gate arm: analog floating-gate
 transistors are not buyable as discrete parts (the analog form is integrated only — an
@@ -128,6 +136,76 @@ def classify_transfer(snr_half, snr_full, snr_robust, writes_per_cell, endurance
         "robust_reads_K": int(robust_reads_K),
         "params_confirmed": bool(params_confirmed),
         "provisional": not bool(params_confirmed),
+    }
+
+
+# --- Phase-1b device-access gate (FROZEN 2026-11-05, committed before any purchase) ----------------
+# The budget is PRE-REGISTERED as the cheapest alternative route to the same measurements: the low
+# end of an analog-capable MPW characterization-shuttle seat (the Phase-1 spec's "$k-$10k+" access
+# landscape). A board that costs more than that route does not beat it. This number is a modeling
+# choice committed before the decision, NOT a purchase authorization: the user ratifies it.
+ACCESS_BUDGET_USD = 5_000.0
+
+
+def classify_access(is_floating_gate, price_usd, fg_programming_user_exposed,
+                    run_mode_local_write=None, budget_usd=ACCESS_BUDGET_USD):
+    """Phase-1b device-access gate: is a commercially available array worth buying for the
+    characterization milestone, and what two-axis audit ceiling can it host AS SOLD? FROZEN 2026-11-05.
+
+    Inputs (read off vendor documentation / primary papers; record an evidence grade beside each):
+      is_floating_gate             weights are non-volatile charge on an isolated gate written by
+                                   tunneling / hot-carrier injection -- NOT a switched-capacitor /
+                                   SRAM-weight part (the FlexAnalog AN231E04 trap).
+      price_usd                    delivered price of board + any tools required to program FGs.
+      fg_programming_user_exposed  the toolchain lets us set INDIVIDUAL FG elements to our own target
+                                   values and read them back. Without it the write side cannot be
+                                   measured at all, so the board cannot do the characterization job.
+      run_mode_local_write         can a fabric-local analog signal trigger injection on a weight FG
+                                   while the circuit RUNS -- no program-mode switch, no
+                                   microprocessor in the loop?  True / False / None (unknown).
+      budget_usd                   the pre-registered ceiling (ACCESS_BUDGET_USD).
+
+    Verdict (gates the purchase on the characterization job only):
+      FORECLOSE  not a floating gate (wrong device), or FG programming not user-exposed (cannot
+                 characterize), or price > budget ("no accessible floating-gate array at acceptable
+                 cost" -- the charter's honest end for this gate).
+      BUY        otherwise: the board replaces the characterization-tapeout milestone; running the
+                 protocol on it flips classify_transfer's params_confirmed.
+    Elevated (recorded co-equally, NOT gating -- the in-fabric question):
+      audit_ceiling    best provenance the board can host as sold: "(physical, physical)" iff
+                       run_mode_local_write is True, else "(cpu, physical)" = inference-grade.
+      in_fabric_path   "device" (True) / "mpw" (False: a custom cell is needed) / "unknown" (None).
+    A BUY with audit_ceiling "(cpu, physical)" buys CHARACTERIZATION and the inference-grade
+    learner, not in-fabric learning. Do not over-read it.
+    """
+    within_budget = float(price_usd) <= float(budget_usd)
+    if not is_floating_gate:
+        status, reason = "FORECLOSE", "not a floating-gate device"
+    elif not fg_programming_user_exposed:
+        status, reason = "FORECLOSE", "FG programming not user-exposed; cannot characterize"
+    elif not within_budget:
+        status, reason = "FORECLOSE", "price exceeds the pre-registered access budget"
+    else:
+        status, reason = "BUY", "floating gate, FG programming exposed, within budget"
+    if run_mode_local_write is True:
+        ceiling, path = "(physical, physical)", "device"
+    elif run_mode_local_write is False:
+        ceiling, path = "(cpu, physical)", "mpw"
+    else:
+        ceiling, path = "(cpu, physical)", "unknown"
+    return {
+        "status": status,
+        "reason": reason,
+        "is_floating_gate": bool(is_floating_gate),
+        "price_usd": float(price_usd),
+        "budget_usd": float(budget_usd),
+        "within_budget": bool(within_budget),
+        "fg_programming_user_exposed": bool(fg_programming_user_exposed),
+        "run_mode_local_write": run_mode_local_write,
+        "audit_ceiling": ceiling,
+        "in_fabric_path": path,
+        "replaces_characterization_tapeout": status == "BUY",
+        "vendor_query_needed": run_mode_local_write is None,
     }
 
 

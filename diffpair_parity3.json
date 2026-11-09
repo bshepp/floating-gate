@@ -1,0 +1,127 @@
+{
+  "config": {
+    "H": 8,
+    "a": 0.4,
+    "V_drive": 1.5,
+    "beta": 0.1,
+    "target": 0.3,
+    "n_epochs": 300,
+    "n_seeds": 10,
+    "sigma_fg": 0.01,
+    "endurance_budget": 100000,
+    "headroom": 0.9,
+    "renorm_sigma": 0.0011320593513522075,
+    "K_grid": [
+      1,
+      100,
+      10000
+    ]
+  },
+  "nominal_cfg": {
+    "g_min": 0.1,
+    "g_max": 10.0,
+    "dG0": 0.05,
+    "nonlin": 3.0,
+    "asym": 1.0,
+    "n_levels": 0,
+    "sigma_write": 0.03,
+    "sigma_read": 0.01,
+    "drift": 0.0,
+    "g_rest": null
+  },
+  "half": {
+    "snr": 7.855791781873572,
+    "n_erases": 0.0,
+    "max_injections_per_cell": 300.0
+  },
+  "full": {
+    "snr": 0.0,
+    "n_erases": 0.0,
+    "max_injections_per_cell": 300.0
+  },
+  "robust": {
+    "snr_robust": 0.0,
+    "robust_reads_K": 1
+  },
+  "writes_per_cell": 300,
+  "verdict": {
+    "status": "PASS",
+    "snr_half": 7.855791781873572,
+    "snr_full": 0.0,
+    "snr_robust": 0.0,
+    "full_status": "FORECLOSE",
+    "robust_status": "FORECLOSE",
+    "in_fabric_achieved": false,
+    "endurance_ok": true,
+    "writes_per_cell": 300,
+    "endurance_budget": 100000,
+    "robust_reads_K": 1,
+    "params_confirmed": false,
+    "provisional": true
+  },
+  "sweeps": {
+    "nonlin": [
+      {
+        "value": 0.0,
+        "snr_half": 17.454446854565113,
+        "n_erases": 284.0
+      },
+      {
+        "value": 1.0,
+        "snr_half": 20.245945945577958,
+        "n_erases": 257.6
+      },
+      {
+        "value": 2.0,
+        "snr_half": 15.815544881596574,
+        "n_erases": 136.8
+      },
+      {
+        "value": 3.0,
+        "snr_half": 7.855791781873572,
+        "n_erases": 0.0
+      },
+      {
+        "value": 4.0,
+        "snr_half": 5.38537772068917,
+        "n_erases": 0.0
+      },
+      {
+        "value": 5.0,
+        "snr_half": 1.6368878030679306,
+        "n_erases": 0.0
+      }
+    ],
+    "headroom": [
+      {
+        "value": 0.3,
+        "snr_half": 8.993163008785341,
+        "n_erases": 292.4
+      },
+      {
+        "value": 0.6,
+        "snr_half": 11.076928967943072,
+        "n_erases": 252.6
+      },
+      {
+        "value": 0.9,
+        "snr_half": 7.855791781873572,
+        "n_erases": 0.0
+      }
+    ]
+  },
+  "audit": {
+    "half": {
+      "breakdown": {
+        "cpu|physical": 24000
+      },
+      "is_physical": false
+    },
+    "full": {
+      "breakdown": {
+        "physical|physical": 24000
+      },
+      "is_physical": true
+    }
+  }
+}

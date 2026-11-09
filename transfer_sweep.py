@@ -20,6 +20,7 @@ from task import parity3_data, verdict as task_verdict
 from verdict import classify_transfer, PASS_SNR
 from fg_params import (fg_device_config, SIGMA_FG, ENDURANCE_BUDGET, FG_SWEEPS, ROBUST_K_GRID)
 from fg_rules import effective_sigma, writes_per_cell
+from fg_measured import device_config_from_measurements
 from h5_sweep import rule_audit   # reuse the two-axis audit mapping (half=cpu,phys; full=phys,phys)
 
 
@@ -93,12 +94,14 @@ def _knob_sweeps(nominal_cfg, sigma_fg, *, H=8, a=0.4, V_drive=1.5, beta=0.1, ta
 
 def run_transfer(*, H=8, a=0.4, V_drive=1.5, beta=0.1, target=0.3, n_epochs=300, seeds=range(10),
                  sigma_fg=SIGMA_FG, endurance_budget=ENDURANCE_BUDGET, params_confirmed=False,
-                 K_grid=None):
+                 K_grid=None, cfg=None):
     """Drive the gate (half rule at the nominal FG cfg), the elevated in-fabric records (the two-read
     rule, and the multi-read-averaged robust candidate), the endurance check, and the Observed knob
-    sweeps; classify with the frozen classify_transfer; record the two-axis audit for both rules."""
+    sweeps; classify with the frozen classify_transfer; record the two-axis audit for both rules.
+    `cfg` defaults to the pre-registered fg_device_config(); pass a MEASURED DeviceConfig (fg_measured)
+    with params_confirmed=True to re-run the same frozen gate on a real device (Phase 1b)."""
     seeds = list(seeds)
-    cfg = fg_device_config()
+    cfg = fg_device_config() if cfg is None else cfg
     kw = dict(H=H, a=a, V_drive=V_drive, beta=beta, target=target, n_epochs=n_epochs, seeds=seeds)
 
     snr_half = _snr_at_cfg("half", cfg, sigma_fg, **kw)            # GATE (buildable object)
@@ -162,13 +165,28 @@ def main(argv=None):
     ap.add_argument("--seeds", type=int, default=10)
     ap.add_argument("--beta", type=float, default=0.1)
     ap.add_argument("--quick", action="store_true", help="tiny local smoke (few seeds/epochs/K)")
+    ap.add_argument("--measured", default=None,
+                    help="JSON of bench measurements (fg_measured.REQUIRED_MEASUREMENTS + prog_rms_error); "
+                         "re-runs the frozen gate at the MEASURED DeviceConfig with params_confirmed=True")
+    ap.add_argument("--write-mode", default="closed_loop", choices=["closed_loop", "open_loop"],
+                    help="with --measured: which write mode the learner uses (see fg_measured)")
+    ap.add_argument("--differential", action="store_true",
+                    help="with --measured: injection-only part, weight is a differential pair (asym -> 1)")
     args = ap.parse_args(argv)
+
+    extra = {}
+    if args.measured:
+        with open(args.measured) as fp:
+            m = json.load(fp)
+        cfg = device_config_from_measurements(m, write_mode=args.write_mode,
+                                              differential_pair=args.differential)
+        extra = dict(cfg=cfg, sigma_fg=cfg.sigma_read, params_confirmed=True)
 
     if args.quick:
         res = run_transfer(seeds=_QUICK["seeds"], n_epochs=_QUICK["n_epochs"],
-                           beta=args.beta, K_grid=_QUICK["K_grid"])
+                           beta=args.beta, K_grid=_QUICK["K_grid"], **extra)
     else:
-        res = run_transfer(seeds=range(args.seeds), n_epochs=args.epochs, beta=args.beta)
+        res = run_transfer(seeds=range(args.seeds), n_epochs=args.epochs, beta=args.beta, **extra)
 
     _print_summary(res)
     with open(args.out, "w") as fp:

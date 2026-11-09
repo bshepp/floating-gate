@@ -16,8 +16,23 @@ non-ideality is the FG **update nonlinearity**, not precision/retention (ν=3 fo
 precision; ν→0 co-design or closed-loop compensation required). The next move is the open
 *read-noise-robust **in-fabric** update* problem (or a characterization tapeout to confirm the
 provisional params). See `docs/superpowers/findings/2026-06-25-phase1-transfer-sim-gate-findings.md`.
-**Aspirational / trailing:** no floating-gate device is owned or buyable (see below), so the operating
-point is provisional and nothing is built until access is secured.
+**Phase 1b** (device access, 2026-11-05) → the "not buyable" premise is **corrected**: Okika Devices now sells
+the Georgia Tech / Hasler floating-gate SoC FPAA (RASP 3.0 lineage) as the **OTC2902K** board ($2,499 list).
+The frozen `classify_access` reads **BUY** for the characterization job (it replaces the characterization
+tapeout) with an **inference-grade audit ceiling** `(cpu, physical)` — as published, FG writes go through
+program mode under the on-chip MSP430, so in-fabric learning is *not* established by the purchase; the
+run-mode local write is **not** available on the published design (answered 2026-11-08 by identity with
+the papers: injection is program-mode only, under the programming infrastructure), so the in-fabric path is a
+custom cell (MPW) and the board is the characterization instrument + inference-grade host. The family is
+**injection-only with global erase**, so the device-faithful weight is a differential pair (Phase 1c,
+`fg_diffpair.py`). **Phase 1c** (2026-11-08, pre-registered H6): the injection-only **differential-pair** learner
+**PASSes at raw ν=3** (SNR 7.9) where the single-cell model foreclosed (0.2) — so an open-loop single-pulse
+learner is viable on this family (inference-grade); the win comes from cells starting at the bottom of range with
+a device-set annealing decay, *not* from renormalization (0 erases at the nominal); the raw-ν cliff moves to
+ν≈5; the in-fabric two-read rule still forecloses. See
+`docs/superpowers/findings/2026-11-08-phase1c-diffpair-injection-only-findings.md`. **Nothing bought yet.** Beware the same vendor's
+FlexAnalog boards: they are the Anadigm AN231E04 switched-cap part, not floating gates. See
+`docs/superpowers/findings/2026-11-05-phase1b-okika-access-findings.md`.
 
 ## The three crossbar cousins (and why only two can learn)
 
@@ -25,22 +40,30 @@ point is provisional and nothing is built until access is secured.
 
 | sibling | device | in-fabric write? | role |
 |---|---|---|---|
-| `fpaa-neural-net` | Anadigm AN231E04 (switched-capacitor FPAA, **owned**) | **No** — host writes weights over SPI = electronic = inference | representability ceiling, not learning |
+| `fpaa-neural-net` | Anadigm AN231E04 (switched-capacitor FPAA, **owned**; sold since 2025 as Okika *FlexAnalog*) | **No** — host writes weights over SPI = electronic = inference | representability ceiling, not learning |
 | `06-crossbar-build` | discrete memristor (buyable, e.g. Knowm) | Yes — physical pulse write | first *buyable* in-fabric build |
-| **`08-floating-gate`** (this) | analog floating-gate transistor array | **Yes** — charge by tunneling / injection | the *aspirational* in-fabric build |
+| **`08-floating-gate`** (this) | analog floating-gate transistor array (now buyable: Okika OTC2902K SoC FPAA) | **Yes** — charge by tunneling / injection | the in-fabric build; inference-grade host as sold |
 
 The owned FPAA is switched-capacitor: every weight change is a host write, so by this
 project's own audit it is inference, however well it classifies. A floating gate, by contrast,
 stores charge that a physical write event changes — so it *can* keep the update in the fabric.
 That is `08`'s entire reason to exist as distinct from `fpaa-neural-net`.
 
-## Why aspirational
+## Why it was aspirational — and what changed (2026-11-05)
 
 Analog floating-gate transistors are **not sold as discrete parts** — the analog form is
-integrated only (academic FG-FPAAs, or a CMOS/MPW fab run). So unlike `06` (a buyable
-memristor), `08` has **no device to characterize today**. Phase 0 runs against a *provisional*
-read noise `σ_fg`; the verdict carries `provisional=True` until a real array confirms it. A
-clean "no accessible floating-gate array at acceptable cost" is a valid Phase-1 FORECLOSE.
+integrated only (FG-FPAAs, or a CMOS/MPW fab run). When this project started (2026-06) no such
+array was purchasable, so Phase 0/1 ran against a *provisional* operating point (`provisional=True`
+until a real array confirms it), and "no accessible floating-gate array at acceptable cost" was a
+valid Phase-1 FORECLOSE.
+
+**That path is now closed:** Okika Devices sells the Georgia Tech SoC FPAA (George et al., TVLSI 2016)
+as the OTC2902K board. The access decision is itself a frozen verdict (`classify_access`, spec
+`2026-11-05-phase1b-device-access-gate-design.md`), and the bench protocol that turns board
+measurements into the vendored `DeviceConfig` lives in `fg_measured.py`
+(`python transfer_sweep.py --measured measurements.json` re-runs the frozen Phase-1 gate with
+`params_confirmed=True`). What the board does **not** settle is the in-fabric write: as published, FG
+programming happens in program mode under the on-chip microprocessor, i.e. `(cpu, physical)`.
 
 ## The throughline (inherited, sharpened for hardware)
 
@@ -72,6 +95,9 @@ A clean **FORECLOSE at any gate is a valid, money-saving end.** Verdicts are fro
   array (FG-FPAA collaboration or MPW run), characterize it — read noise (confirming `σ_fg`)
   **and the write side** (programming precision/granularity, tunneling/injection asymmetry,
   endurance, retention) — re-sim at measured parameters, classify transfer.
+  **Phase 1b (access, 2026-11-05):** `classify_access` frozen before any purchase — BUY iff floating
+  gate ∧ FG programming user-exposed ∧ price ≤ pre-registered budget; records the audit ceiling the
+  board can host as sold. Run on the Okika OTC2902K → BUY, ceiling `(cpu, physical)`, in-fabric path `mpw`.
 - **Phase 2 — build (only on Phase-1 PASS).** Program the half-co-located learner on the
   floating-gate array; demonstrate parity-3 / XOR learned **in-fabric**, audited on both axes.
 
@@ -86,10 +112,20 @@ device access (Phase 1) and the write side (Phase 1/2), not the math.
 ## Layout
 
 ```
-verdict.py        # FROZEN Phase-0 classify_h5 (provisional σ_fg; +Phase-1/2 to be frozen later)
-tests/            # unit tests that brute-force the frozen decision function
+verdict.py        # FROZEN classify_h5 (Phase 0), classify_transfer (Phase 1), classify_access (Phase 1b)
+fg_params.py      # pre-registered (provisional) FG operating point + sweeps
+fg_rules.py       # read-averaging model + endurance write-count
+fg_measured.py    # bench measurements -> vendored DeviceConfig (+ CHARACTERIZATION_PROTOCOL)
+fg_access.py      # observed Okika inputs through classify_access -> access_okika.json
+fg_diffpair.py    # Phase-1c injection-only differential-pair learner -> diffpair_parity3.json
+measurements_template.json  # what the bench fills in for transfer_sweep.py --measured
+h5_sweep.py       # Phase-0 runner -> h5_sweep_parity3.json
+transfer_sweep.py # Phase-1 runner -> transfer_parity3.json (--measured re-runs on a real device)
+vendor_02/        # 02's sim, vendored verbatim
+tests/            # one pytest module per source module; the verdicts are brute-forced
 docs/superpowers/
-  specs/          # the design spec (2026-06-24)
+  specs/          # design specs (2026-06-24, 06-25, 11-05, 11-08)
+  plans/          # runner plans + the Okika pre-purchase checklist (11-08)
   findings/       # Observed / Interpretation, filled as phases run
 ```
 
